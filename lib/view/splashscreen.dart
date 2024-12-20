@@ -30,7 +30,7 @@ class _SplasScreenState extends State<SplasScreen> {
   double screenHeight = 0;
   double screenWidth = 0;
 
-  String base_url = "https://biforst.id/";
+  String base_url = "https://biforst.cbnet.my.id/";
   Settings? settings;
   String _isAlreadyDoSettings = 'no';
 
@@ -45,7 +45,7 @@ class _SplasScreenState extends State<SplasScreen> {
       uid: 1,
       nik: "12345678910",
       nama: "BIFORST INDONESIA",
-      email: "it@biforst.id",
+      email: "it@biforst.cbnet.my.id",
       role: 1,
       status: 0,
     );

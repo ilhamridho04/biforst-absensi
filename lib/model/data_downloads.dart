@@ -2,7 +2,7 @@ class DownloadItems {
   static const apks = [
     DownloadItem(
       name: 'BIFORST ABSENSI',
-      url: 'https://biforst.id/api/v1/downloads',
+      url: 'https://biforst.cbnet.my.id/api/v1/downloads',
     )
   ];
 }

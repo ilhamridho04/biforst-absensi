@@ -16,6 +16,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
+import 'package:safe_device/safe_device.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 import 'package:sn_progress_dialog/sn_progress_dialog.dart';
@@ -41,7 +42,14 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   late TargetPlatform? platform;
-  bool? _isMock;
+
+  bool isMockLocation = false;
+  bool isRealDevice = false;
+  bool isOnExternalStorage = false;
+  bool isSafeDevice = false;
+  bool isDevelopmentModeEnable = false;
+  bool _isInitInProgress = false;
+
   String? nik = "",
       nama = "",
       email = "",
@@ -74,6 +82,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   late ProgressDialog pd;
   late bool clickButton = false, isLoading = true;
+  bool isUpdate = false;
   var subscription, getId, _value;
   double setAccuracy = 200.0;
   File? _image, newImage;
@@ -85,30 +94,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   void initState() {
-    getSetting();
-    _getCurrentPosition();
-    _getPermission();
     super.initState();
+
+    getSetting();
+    initPlatformState();
   }
 
   @override
   void dispose() {
     _timer.cancel();
     super.dispose();
-  }
-
-  void _getPermission() async {
-    getPermissionAttendance();
-    _checkGps();
-  }
-
-  void getPermissionAttendance() async {
-    await [
-      Permission.storage,
-      Permission.camera,
-      Permission.location,
-      Permission.locationWhenInUse,
-    ].request();
   }
 
   Future<void> getImage() async {
@@ -135,12 +130,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 // Send data post via http
   Future<void> sendData() async {
     if (_value == null) {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              select_area, "warning", AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            select_area, "warning", AlertType.warning, context, true);
       });
       return;
     }
@@ -164,9 +157,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     FormData formData = FormData.fromMap(body);
 
     ProgressDialog pd = ProgressDialog(context: context);
+
     pd.show(
       max: 100,
-      msg: 'Hampir selesai...',
+      msg: 'Sedang upload gambar...',
       progressType: ProgressType.valuable,
       backgroundColor: ThemeColor.white,
       progressValueColor: ThemeColor.primary,
@@ -188,50 +182,46 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         );
       },
     );
+    pd.close();
 
     var data = response.data;
     // Show response from server via snackBar
     if (data['message'] == 'Success!') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          String urlCekhadir =
-          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-          CekKehadiran(urlCekhadir);
-          Attendance attendance = Attendance(
-            id: data['id'],
-            date: data['date'],
-            time: data['time'],
-            location: data['location'],
-            type: "Check-In",
-          );
+      String urlCekhadir =
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
+      await cekKehadiran(urlCekhadir);
 
-          // Insert the attendance
-          insertAttendance(attendance);
-          subscription.cancel();
+      setState(() {
+        Attendance attendance = Attendance(
+          id: data['id'],
+          date: data['date'],
+          time: data['time'],
+          location: data['location'],
+          type: "Check-In",
+        );
 
-          Alert(
-            context: context,
-            type: AlertType.success,
-            title: "Success",
-            desc: "$attendance_show_alert-in $attendance_success_ms",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
-        });
+        // Insert the attendance
+        insertAttendance(attendance);
+        subscription.cancel();
+        Alert(
+          context: context,
+          type: AlertType.success,
+          title: "Success",
+          desc: "$attendance_show_alert-in $attendance_success_ms",
+          buttons: [
+            DialogButton(
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pop(),
+              width: 120,
+              child: Text(
+                ok_text,
+                style: TextStyle(color: Colors.white, fontSize: 20),
+              ),
+            )
+          ],
+        ).show();
       });
     } else if (data['message'] == 'key_not_valid') {
-      if (pd.isOpen()) {
-        pd.close();
-      }
       // Alert Dialog
       showDialog(
           context: context,
@@ -242,8 +232,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               img: Image.asset('assets/images/logo.png'),
               btn: ElevatedButton(
                 onPressed: () {
+                  setState(() {
+                    isUpdate = true;
+                  });
                   Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (context) => DownloadsPage()));
+                      MaterialPageRoute(builder: (context) => DownloadsPage())
+                  );
                 },
                 child: Text(
                   "Download",
@@ -254,70 +248,58 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ),
               ),
             );
-          });
+          }
+      );
     } else if (data['message'] == 'cannot_attend') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              '$outside_area', "warning", AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            outside_area, "warning", AlertType.warning, context, true);
       });
     } else if (data['message'] == 'location_not_found') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          pd.close();
-          // Alert Dialog
-          utils.showAlertDialog('$location_not_found', "warning",
-              AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(location_not_found, "warning",
+            AlertType.warning, context, true);
       });
     } else if (data['message'] == 'sudah_cek_in') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          subscription.cancel();
-          Alert(
-            context: context,
-            type: AlertType.info,
-            title: "Berhasil",
-            desc: "$already_check_in",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
-        });
+      setState(() {
+        subscription.cancel();
+        Alert(
+          context: context,
+          type: AlertType.info,
+          title: "Berhasil",
+          desc: already_check_in,
+          buttons: [
+            DialogButton(
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pop(),
+              width: 120,
+              child: Text(
+                ok_text,
+                style: TextStyle(color: Colors.white, fontSize: 20),
+              ),
+            )
+          ],
+        ).show();
       });
     } else if (data['message'] == 'check_in_first') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              '$check_in_first', "warning", AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            check_in_first, "warning", AlertType.warning, context, true);
       });
     } else if (data['message'] == 'error_something_went_wrong') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog('$attendance_error_server', "Error",
-              AlertType.error, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(attendance_error_server, "Error",
+            AlertType.error, context, true);
       });
     } else {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(response.data.toString(), "Error",
-              AlertType.error, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(response.data.toString(), "Error",
+            AlertType.error, context, true);
       });
     }
   }
@@ -369,134 +351,87 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     var data = response.data;
     // Show response from server via snackBar
     if (data['message'] == 'Success!') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          String urlCekhadir =
-          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-          CekKehadiran(urlCekhadir);
-          subscription.cancel();
-          Alert(
-            context: context,
-            type: AlertType.success,
-            title: "Success",
-            desc: "$attendance_show_alert-in $attendance_success_ms",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
-        });
+      String urlCekhadir =
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+      await cekKehadiran(urlCekhadir);
+      subscription.cancel();
+      setState(() {
+        Alert(
+          context: context,
+          type: AlertType.success,
+          title: "Success",
+          desc: "$attendance_show_alert-in $attendance_success_ms",
+          buttons: [
+            DialogButton(
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pop(),
+              width: 120,
+              child: Text(
+                ok_text,
+                style: TextStyle(color: Colors.white, fontSize: 20),
+              ),
+            )
+          ],
+        ).show();
       });
     } else if (data['message'] == 'cannot_attend') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              outside_area, "warning", AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            outside_area, "warning", AlertType.warning, context, true);
       });
     } else if (data['message'] == 'location_not_found') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              location_not_found, "warning", AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            location_not_found, "warning", AlertType.warning, context, true);
       });
     } else if (data['message'] == 'sudah_cek_in') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          subscription.cancel();
-          Alert(
-            context: context,
-            type: AlertType.info,
-            title: "Berhasil",
-            desc: "$already_check_in",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
-        });
+      setState(() {
+        subscription.cancel();
+        Alert(
+          context: context,
+          type: AlertType.info,
+          title: "Berhasil",
+          desc: "$already_check_in",
+          buttons: [
+            DialogButton(
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pop(),
+              width: 120,
+              child: Text(
+                ok_text,
+                style: TextStyle(color: Colors.white, fontSize: 20),
+              ),
+            )
+          ],
+        ).show();
       });
     } else if (data['message'] == 'check_in_first') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              check_in_first, "warning", AlertType.warning, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            check_in_first, "warning", AlertType.warning, context, true);
       });
     } else if (data['message'] == 'error_something_went_wrong') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              attendance_error_server, "Error", AlertType.error, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(
+            attendance_error_server, "Error", AlertType.error, context, true);
       });
     } else {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(response.data.toString(), "Error",
-              AlertType.error, context, true);
-        });
+      setState(() {
+        // Alert Dialog
+        utils.showAlertDialog(response.data.toString(), "Error",
+            AlertType.error, context, true);
       });
     }
+    pd.close();
   }
 
   insertAttendance(Attendance object) async {
     final insert = await dbHelper.newAttendances(object);
-    debugPrint("Insert ASBEN :" + insert.toString());
-  }
-
-  // Check the GPS is on
-  Future<void> _checkGps() async {
-    if (!(await Geolocator.isLocationServiceEnabled())) {
-      if (Theme.of(context).platform == TargetPlatform.android) {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return CustomDialogBox(
-              title: cant_get_current_location,
-              descriptions: please_make_sure_enable_gps,
-              img: Image.asset('assets/images/logo.png'),
-              btn: ElevatedButton(
-                onPressed: () async {
-                  final AndroidIntent intent = AndroidIntent(
-                      action: 'android.settings.LOCATION_SOURCE_SETTINGS');
-
-                  await intent.launch();
-                  Navigator.of(context, rootNavigator: true).pop();
-                },
-                child: Text(
-                  "Ok",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontFamily: "MontserratRegular",
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      }
-    }
+    debugPrint("Insert ASBEN :$insert");
   }
 
   void getSetting() async {
@@ -521,183 +456,123 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     var data = response.data;
 
     if (data['message'] == 'success') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          final uri =
-          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
-          CekKehadiran(uri);
-          dataArea = data['area'];
-        });
+      final uri =
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
+      await cekKehadiran(uri);
+      setState(() {
+        dataArea = data['area'];
       });
     } else {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          final uri =
-          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-          CekKehadiran(uri);
-          dataArea = [
-            {"id": 0, "name": "No Data Area"}
-          ];
-        });
+      final uri =
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+      await cekKehadiran(uri);
+      setState(() {
+        dataArea = [
+          {"id": 0, "name": "No Data Area"}
+        ];
       });
     }
   }
 
-  void CekKehadiran(_url) async {
+  Future<void> cekKehadiran(url) async {
     Dio dio = Dio();
-    final response = await dio.get(_url);
-    Future.delayed(Duration(seconds: 0)).then((value) {
-      setState(() {
-        var data = response.data;
-        if (data['message'] == "sudah_cek_in") {
-          _tanggalMasuk = data['user']['tanggal'];
-          _jamMasuk = data['user']['jam'];
-          jamMasuk = data['user']['in'];
-          _jamPulang = data['user']['out'];
-        } else {
-          _tanggalMasuk = data['user']['tanggal'];
-          _jamMasuk = data['user']['jam'];
-          jamMasuk = data['user']['in'];
-          _jamPulang = data['user']['out'];
-        }
-        isLoading = false;
-      });
-    });
-  }
-
-  Future<bool> _handleLocationPermission() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    Future.delayed(Duration(seconds: 3)).then((value) {
-      setState(() {
-        if (_currentAddress == null) {
-          showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return CustomDialogBox(
-                  title: "Lokasi perangkat",
-                  descriptions: please_make_sure_enable_gps,
-                  img: Image.asset('assets/images/logo.png'),
-                  btn: ElevatedButton(
-                    onPressed: () async {
-                      exit(0);
-                    },
-                    child: Text(
-                      "Ok",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontFamily: "MontserratRegular",
-                      ),
-                    ),
-                  ),
-                );
-              });
-        }
-      });
-    });
-
-    if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Layanan lokasi dinonaktifkan. Harap aktifkan layanan lokasi')));
-      return false;
-    }
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return CustomDialogBox(
-                title: "Lokasi perangkat",
-                descriptions: please_make_sure_enable_gps,
-                img: Image.asset('assets/images/logo.png'),
-                btn: ElevatedButton(
-                  onPressed: () async {
-                    final AndroidIntent intent = AndroidIntent(
-                        action: 'android.settings.LOCATION_SOURCE_SETTINGS');
-                    await intent.launch();
-                    Navigator.of(context, rootNavigator: true).pop();
-                  },
-                  child: Text(
-                    "Ok",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontFamily: "MontserratRegular",
-                    ),
-                  ),
-                ),
-              );
-            });
-        return false;
+    final response = await dio.get(url);
+    final data = response.data;
+    setState(() {
+      if (data['message'] == "sudah_cek_in") {
+        _tanggalMasuk = data['user']['tanggal'];
+        _jamMasuk = data['user']['jam'];
+        jamMasuk = data['user']['in'];
+        _jamPulang = data['user']['out'];
+      } else {
+        _tanggalMasuk = data['user']['tanggal'];
+        _jamMasuk = data['user']['jam'];
+        jamMasuk = data['user']['in'];
+        _jamPulang = data['user']['out'];
       }
-    }
-    if (permission == LocationPermission.deniedForever) {
-      showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return CustomDialogBox(
-              title: "Lokasi perangkat",
-              descriptions:
-              "Izin lokasi ditolak secara permanen, kami tidak dapat meminta izin.",
-              img: Image.asset('assets/images/logo.png'),
-              btn: ElevatedButton(
-                onPressed: () async {
-                  final AndroidIntent intent = AndroidIntent(
-                      action: 'android.settings.LOCATION_SOURCE_SETTINGS');
-
-                  await intent.launch();
-                  Navigator.of(context, rootNavigator: true).pop();
-                },
-                child: Text(
-                  "Ok",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontFamily: "MontserratRegular",
-                  ),
-                ),
-              ),
-            );
-          });
-      return false;
-    }
-    return true;
+      isLoading = false;
+    });
   }
 
-  Future<void> _getCurrentPosition() async {
-    final hasPermission = await _handleLocationPermission();
+  void initPlatformState() async {
+    if (_isInitInProgress) return;
 
-    if (!hasPermission) return;
-    await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high)
-        .then((Position position) {
+    setState(() {
+      _isInitInProgress = true;
+    });
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Location permissions are denied');
+        }
+      }
+
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw Exception('Location services are disabled');
+      }
+
+      bool ml = await SafeDevice.isMockLocation;
+      bool rd = await SafeDevice.isRealDevice;
+      bool oes = await SafeDevice.isOnExternalStorage;
+      bool sd = await SafeDevice.isSafeDevice;
+      bool dme = await SafeDevice.isDevelopmentModeEnable;
+
+      setState(() {
+        isMockLocation = ml;
+        isRealDevice = rd;
+        isOnExternalStorage = oes;
+        isSafeDevice = sd;
+        isDevelopmentModeEnable = dme;
+        if (kDebugMode) {
+          print('Ini Attendance : \nisMockLocation: $isMockLocation'
+              '\nisRealDevice: $isRealDevice'
+              '\nisOnExternalStorage: $isOnExternalStorage'
+              '\nisSafeDevice: $isSafeDevice'
+              '\nisDevelopmentModeEnable: $isDevelopmentModeEnable');
+        }
+      });
+    } catch (error) {
+      if (kDebugMode) {
+        print('Error initializing platform state: $error');
+      }
+    } finally {
+      await fetchCurrentPosition();
+      setState(() {
+        _isInitInProgress = false;
+      });
+    }
+  }
+
+  Future<void> fetchCurrentPosition() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       setState(() {
         _currentPosition = position;
         _getAddressFromLatLng(_currentPosition!);
-        _isMock = position.isMocked;
       });
-    }).catchError((e) {
+    } catch (error) {
       if (kDebugMode) {
-        print('Error getting location: $e');
+        print('Error fetching current position: $error');
       }
-    });
+    }
   }
 
   Future<void> _getAddressFromLatLng(Position position) async {
-    await placemarkFromCoordinates(
-        _currentPosition!.latitude, _currentPosition!.longitude)
-        .then((List<Placemark> placemarks) {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude
+      );
       Placemark place = placemarks[0];
       setState(() {
-        Future.delayed(Duration(seconds: 0)).then((value) {
-          _currentAddress =
-          '${place.subLocality}, ${place.locality}, ${place.administrativeArea}, ${place.postalCode}';
-        });
+        _currentAddress = '${place.subLocality}, ${place.locality}, ${place.administrativeArea}, ${place.postalCode}';
       });
-    }).catchError((e) {
-      debugPrint(e);
-    });
+    } catch (e) {
+      debugPrint(e.toString());
+    }
   }
 
   void _getTime() {
@@ -723,7 +598,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         uid: 1,
         nik: "12345678910",
         nama: "BIFORST INDONESIA",
-        email: "it@biforst.id",
+        email: "it@biforst.cbnet.my.id",
         role: 1,
         status: 0,
       );
@@ -741,15 +616,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: isLoading
+      body: isLoading && _isInitInProgress
           ? Center(
         child: LoadingAnimationWidget.discreteCircle(
           color: ThemeColor.primary,
           size: 50,
         ),
-      )
-          : _isMock != true
-          ? SingleChildScrollView(
+      ) : SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Center(
           child: Column(
@@ -1100,8 +973,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       outerColor: Colors.white,
                       innerColor: ThemeColor.red,
                       key: key,
-                      onSubmit: () {
-                        _cekOut();
+                      onSubmit: () async {
+                        await _cekOut();
                         return null;
                       },
                     );
@@ -1113,7 +986,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
         ),
       )
-          : DeveloperInfo(nama: nama ?? "User"),
+      ,
     );
   }
 

@@ -6,11 +6,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:progress_dialog_null_safe/progress_dialog_null_safe.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
+import 'controller/custom_dialog_box.dart';
 import 'database/db_helper.dart';
 import 'homescreen.dart';
 import 'model/colors.dart';
@@ -18,7 +20,7 @@ import 'model/settings.dart';
 import 'model/user.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -27,11 +29,12 @@ class LoginScreen extends StatefulWidget {
 enum LoginStatus { notSignIn, signIn, doubleCheck }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Global key scaffold
+    // Global key scaffold
   final _key = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   LoginStatus _loginStatus = LoginStatus.notSignIn;
+  bool _isPermissionRequestInProgress = false;
 
   String? nik, nama, email, pass, isLogged, getUrl, getKey;
   int? uid, role;
@@ -44,18 +47,17 @@ class _LoginScreenState extends State<LoginScreen> {
   DbHelper dbHelper = DbHelper();
   late ProgressDialog pr;
   bool _secureText = true;
+  bool isError = false;
+
+  late String errorTitle, errorMessage;
 
   Color primary = Colors.blue;
 
   @override
   void initState() {
-    getSettings();
     super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
+    getSettings();
+    getPermissionAttendance();
   }
 
   showHide() {
@@ -83,9 +85,36 @@ class _LoginScreenState extends State<LoginScreen> {
     getPref();
   }
 
+  Future<void> getPermissionAttendance() async {
+    if (_isPermissionRequestInProgress) return;
+
+    setState(() {
+      _isPermissionRequestInProgress = true;
+    });
+
+    try {
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.camera,
+        Permission.location,
+        Permission.locationWhenInUse,
+      ].request();
+
+      // Handle the permission statuses here
+
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to request permissions: $e');
+      }
+    } finally {
+      setState(() {
+        _isPermissionRequestInProgress = false;
+      });
+    }
+  }
+
   void login(String fromWhere) async {
     if (fromWhere == 'clickButton') pr.show();
-    var urlLogin = "https://biforst.id/api/auth/login2";
+    var urlLogin = "https://biforst.cbnet.my.id/api/auth/login2";
     try {
       var dio = Dio();
       FormData formData = FormData.fromMap({
@@ -104,8 +133,9 @@ class _LoginScreenState extends State<LoginScreen> {
       var data = response.data;
       String message = data['message'];
       String pesan = data['pesan'];
+      pr.hide();
       if (message == 'success') {
-        isLogged = statusLogged;
+
         uid = data['user']['id'];
         nik = data['user']['nik'];
         nama = data['user']['nama'];
@@ -121,56 +151,42 @@ class _LoginScreenState extends State<LoginScreen> {
           role: role!,
           status: 1,
         );
+
+        Settings updateSettings = Settings(id: 1, url: base_url, key: key_app);
+        dbHelper.updateSettings(updateSettings);
+        updateUser(user);
         setState(() {
-          Future.delayed(Duration(seconds: 2)).then((value) {
-            pr.hide().whenComplete(() {
-              print(pr.isShowing());
-            });
-            Settings updateSettings =
-            Settings(id: 1, url: base_url, key: key_app);
-            dbHelper.updateSettings(updateSettings);
-            updateUser(user);
-          });
+          isLogged = statusLogged;
         });
       } else {
-        if (fromWhere == 'clickButton') {
-          setState(() {
-            Future.delayed(Duration(seconds: 2)).then((value) {
-              pr.hide().whenComplete(() {
-                if (kDebugMode) {
-                  print(pr.isShowing());
-                }
-              });
-              Alert(
-                  context: context,
-                  type: AlertType.error,
-                  title: message.toUpperCase(),
-                  desc: pesan,
-                  buttons: [
-                    DialogButton(
-                      onPressed: () => Navigator.pop(context),
-                      width: 75,
-                      child: Text(
-                        "Ok",
-                        style: TextStyle(color: Colors.white, fontSize: 20),
-                      ),
-                    ),
-                  ]).show();
-            });
-          });
-        } else {
-          setState(() {
-            _loginStatus = LoginStatus.notSignIn;
-            removePref();
-          });
-        }
+        setState(() {
+          errorTitle = message;
+          errorMessage = pesan;
+          isError = true;
+          _loginStatus = LoginStatus.notSignIn;
+          removePref();
+        });
+        showErrorAlert(message, pesan);
       }
     } on DioError catch (ex) {
-      if (ex.type == DioErrorType.connectionTimeout) {
-        throw Exception("Connection Timeout Exception");
-      }
-      throw Exception(ex.message);
+      handleDioError(ex);
+    } finally {
+      setState(() {
+        pr.hide();
+      });
     }
+  }
+
+  void handleDioError(DioError ex) {
+    String? errorMessage;
+    if (ex.type == DioErrorType.connectionTimeout) {
+      errorMessage = "Connection Timeout Exception";
+    } else if (ex.type == DioErrorType.receiveTimeout) {
+      errorMessage = "Receive Timeout Exception";
+    } else {
+      errorMessage = ex.message;
+    }
+    throw Exception(errorMessage);
   }
 
   void getPref() async {
@@ -223,18 +239,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void updateUser(User object) async {
     await dbHelper.updateUser(object);
-    Future.delayed(Duration(seconds: 0)).then((value) {
-      if (mounted) {
-        setState(() {
-          goToMainMenu();
-        });
-      }
-    });
+    if (mounted) {
+      setState(() {
+        goToMainMenu();
+      });
+    }
   }
 
   void goToMainMenu() {
-    _loginStatus = LoginStatus.signIn;
-    savePref(isLogged!, email!, pass!, uid!, "$key_app");
+    setState(() {
+      _loginStatus = LoginStatus.signIn;
+      savePref(isLogged!, email!, pass!, uid!, key_app);
+    });
     // Navigator.of(context).pop();
   }
 
@@ -258,16 +274,32 @@ class _LoginScreenState extends State<LoginScreen> {
     preferences.setInt("id", 0);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final bool isKeyboardVisible =
-    KeyboardVisibilityProvider.isKeyboardVisible(context);
-    screenHeight = MediaQuery.of(context).size.height;
-    screenWidth = MediaQuery.of(context).size.width;
+  void showErrorAlert(String title, String desc) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return CustomDialogBox(
+          title: title,
+          descriptions: desc,
+          img: Image.asset('assets/images/logo.png'),
+          btn: ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text(
+              "Ok",
+              style: TextStyle(
+                fontSize: 18,
+                fontFamily: "MontserratRegular",
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: ThemeColor.primary,
-    ));
+  void initProgressDialog(BuildContext context) {
     pr = ProgressDialog(context,
         type: ProgressDialogType.normal, isDismissible: false, showLogs: false);
     pr.style(
@@ -290,6 +322,30 @@ class _LoginScreenState extends State<LoginScreen> {
           fontFamily: "MontserratRegular",
           fontSize: screenWidth / 24,
         ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isKeyboardVisible =
+    KeyboardVisibilityProvider.isKeyboardVisible(context);
+    screenHeight = MediaQuery.of(context).size.height;
+    screenWidth = MediaQuery.of(context).size.width;
+
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: ThemeColor.primary,
+    ));
+
+    if (isError) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showErrorAlert(errorTitle, errorMessage);
+        setState(() {
+          isError = false;
+        });
+      });
+    }
+
+    initProgressDialog(context);
+
     switch (_loginStatus) {
       case LoginStatus.notSignIn:
         return Scaffold(

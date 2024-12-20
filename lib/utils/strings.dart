@@ -6,8 +6,8 @@ const String about_title = 'Tentang';
 const String key_app = "kSofEF8W17gTzGN4DqHUlYZ3bmMRXuQp9dOcjv6hBVAtynw5s2";
 const String about_app_name = '$app_name';
 const String about_developer = "Developer: BIFORST Tech Indonesia";
-const String about_url = 'https://biforst.id/';
-const String base_url = 'https://biforst.id/';
+const String about_url = 'https://biforst.cbnet.my.id/';
+const String base_url = 'https://biforst.cbnet.my.id/';
 const String about_desc = '$app_name adalah aplikasi untuk absensi online.';
 
 // Attendance page

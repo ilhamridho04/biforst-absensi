@@ -15,10 +15,10 @@ import '../model/data_downloads.dart';
 import '../utils/download_list_item.dart';
 
 class DownloadsPage extends StatefulWidget with WidgetsBindingObserver {
-  const DownloadsPage({Key? key}) : super(key: key);
+  const DownloadsPage({super.key});
 
   @override
-  _DownloadsPageState createState() => _DownloadsPageState();
+  State<DownloadsPage> createState() => _DownloadsPageState();
 }
 
 class _DownloadsPageState extends State<DownloadsPage> {

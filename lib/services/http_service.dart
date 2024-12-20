@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 class HttpService {
   late Dio _dio;
 
-  final baseUrl = "https://biforst.id";
+  final baseUrl = "https://biforst.cbnet.my.id";
 
   HttpService() {
     _dio = Dio(

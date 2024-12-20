@@ -15,7 +15,9 @@ class CustomDialogBox extends StatefulWidget {
         required this.btn});
 
   @override
-  _CustomDialogBoxState createState() => _CustomDialogBoxState();
+  State<CustomDialogBox> createState() {
+    return _CustomDialogBoxState();
+  }
 }
 
 class _CustomDialogBoxState extends State<CustomDialogBox> {
@@ -31,7 +33,7 @@ class _CustomDialogBoxState extends State<CustomDialogBox> {
     );
   }
 
-  contentBox(context) {
+  Widget contentBox(BuildContext context) {
     return Stack(
       children: <Widget>[
         Container(
@@ -45,7 +47,7 @@ class _CustomDialogBoxState extends State<CustomDialogBox> {
               shape: BoxShape.rectangle,
               color: Colors.white,
               borderRadius: BorderRadius.circular(Constants.padding),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
                     color: Colors.black, offset: Offset(0, 10), blurRadius: 10),
               ]),
@@ -54,23 +56,23 @@ class _CustomDialogBoxState extends State<CustomDialogBox> {
             children: <Widget>[
               Text(
                 widget.title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 22,
                   fontFamily: "MontserratRegular",
                 ),
               ),
-              SizedBox(
+              const SizedBox(
                 height: 15,
               ),
               Text(
                 widget.descriptions,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontFamily: "MontserratRegular",
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(
+              const SizedBox(
                 height: 22,
               ),
               Align(

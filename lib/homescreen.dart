@@ -4,9 +4,9 @@ import 'package:attendance/view/components/developer_info.dart';
 import 'package:attendance/view/profile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:progress_dialog_null_safe/progress_dialog_null_safe.dart';
 import 'package:safe_device/safe_device.dart';
@@ -23,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-
   String? nik, nama, email, pass, isLogged, getUrl, getKey;
 
   // Global key scaffold
@@ -39,16 +38,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Color primary = Colors.blue;
 
   int _currentIndex = 1;
-  bool isJailBroken = false;
   bool isMockLocation = false;
   bool isRealDevice = false;
   bool isOnExternalStorage = false;
   bool isSafeDevice = false;
   bool isDevelopmentModeEnable = false;
+  bool _isInitInProgress = false; // Declare the variable here
 
   Utils utils = Utils();
 
   late ProgressDialog pr;
+
+  bool isLoading = true;
 
   List<IconData> navigationIcons = [
     FontAwesomeIcons.calendarAlt,
@@ -58,10 +59,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void initState() {
-
-    initPlatformState();
-    getSetting();
     super.initState();
+
+    getSetting();
+    initPlatformState();
+    crossFadeState = CrossFadeState.showFirst;
   }
 
   @override
@@ -69,44 +71,63 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> initPlatformState() async {
+  void initPlatformState() async {
+    if (_isInitInProgress) return;
+
+    setState(() {
+      _isInitInProgress = true;
+    });
+
     try {
-      LocationPermission permission;
-      permission = await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          return Future.error('Location permissions are denied');
+          throw Exception('Location permissions are denied');
         }
       }
-      isJailBroken = await SafeDevice.isJailBroken;
-      isMockLocation = await SafeDevice.isMockLocation;
-      isRealDevice = await SafeDevice.isRealDevice;
-      isOnExternalStorage = await SafeDevice.isOnExternalStorage;
-      isSafeDevice = await SafeDevice.isSafeDevice;
-      isDevelopmentModeEnable = await SafeDevice.isDevelopmentModeEnable;
-      if (kDebugMode) {
-        print('isJailBroken: $isJailBroken'
-          '\nisMockLocation: $isMockLocation'
-          '\nisRealDevice: $isRealDevice'
-          '\nisOnExternalStorage: $isOnExternalStorage'
-          '\nisSafeDevice: $isSafeDevice'
-          '\nisDevelopmentModeEnable: $isDevelopmentModeEnable');
+
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw Exception('Location services are disabled');
       }
-      setState(() {});
+
+      bool ml = await SafeDevice.isMockLocation;
+      bool rd = await SafeDevice.isRealDevice;
+      bool oes = await SafeDevice.isOnExternalStorage;
+      bool sd = await SafeDevice.isSafeDevice;
+      bool dme = await SafeDevice.isDevelopmentModeEnable;
+
+      setState(() {
+        isMockLocation = ml;
+        isRealDevice = rd;
+        isOnExternalStorage = oes;
+        isSafeDevice = sd;
+        isDevelopmentModeEnable = dme;
+        if (kDebugMode) {
+          print('Ini Attendance : \nisMockLocation: $isMockLocation'
+              '\nisRealDevice: $isRealDevice'
+              '\nisOnExternalStorage: $isOnExternalStorage'
+              '\nisSafeDevice: $isSafeDevice'
+              '\nisDevelopmentModeEnable: $isDevelopmentModeEnable');
+        }
+      });
     } catch (error) {
       if (kDebugMode) {
-        print(error);
+        print('Error initializing platform state: $error');
       }
+    } finally {
+      setState(() {
+        isLoading = false;
+        _isInitInProgress = false;
+      });
     }
   }
 
-  void getPermissionAttendance() async {
-    await [
-      Permission.camera,
-      Permission.location,
-      Permission.locationWhenInUse,
-    ].request();
+  void checkServiceStatus(
+      BuildContext context, PermissionWithService permission) async {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text((await permission.serviceStatus).toString()),
+    ));
   }
 
   void getSetting() async {
@@ -126,8 +147,14 @@ class _HomeScreenState extends State<HomeScreen> {
     screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: isDevelopmentModeEnable != false
-          ? FadeIndexedStack(
+      body: isLoading ? Center(
+        child: LoadingAnimationWidget.discreteCircle(
+          color: ThemeColor.primary,
+          size: 50,
+        ),
+      ) : !isDevelopmentModeEnable
+          ? DeveloperInfo(nama: nama ?? "User")
+          : FadeIndexedStack(
         index: _currentIndex,
         children: [
           Center(
@@ -136,81 +163,79 @@ class _HomeScreenState extends State<HomeScreen> {
           AttendanceScreen(),
           ProfileScreen(),
         ],
-      )
-          : DeveloperInfo(nama: nama ?? "User",),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Container(
-            height: 70,
-            margin: EdgeInsets.only(
-              left: 12,
-              right: 12,
-              bottom: 24,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.all(Radius.circular(40)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: Offset(2, 2),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.all(Radius.circular(40)),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // perulangan Expanded
-                  for (int i = 0; i < navigationIcons.length; i++) ...<Expanded>{
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _currentIndex = i;
-                          });
-                        },
-                        child: Container(
-                          height: screenHeight,
-                          width: screenWidth,
-                          color: Colors.white,
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  navigationIcons[i],
-                                  color: i == _currentIndex
-                                      ? ThemeColor.primary
-                                      : Colors.black54,
-                                  size: i == _currentIndex ? 32 : 26,
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          height: 70,
+          margin: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            bottom: 24,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.all(Radius.circular(40)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(2, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.all(Radius.circular(40)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (int i = 0; i < navigationIcons.length; i++) ...<Expanded>{
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _currentIndex = i;
+                        });
+                      },
+                      child: Container(
+                        height: screenHeight,
+                        width: screenWidth,
+                        color: Colors.white,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                navigationIcons[i],
+                                color: i == _currentIndex
+                                    ? ThemeColor.primary
+                                    : Colors.black54,
+                                size: i == _currentIndex ? 32 : 26,
+                              ),
+                              i == _currentIndex
+                                  ? Container(
+                                margin: EdgeInsets.only(top: 6),
+                                height: 3,
+                                width: 24,
+                                decoration: BoxDecoration(
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(40)),
+                                  color: ThemeColor.primary,
                                 ),
-                                i == _currentIndex
-                                    ? Container(
-                                  margin: EdgeInsets.only(top: 6),
-                                  height: 3,
-                                  width: 24,
-                                  decoration: BoxDecoration(
-                                    borderRadius: const BorderRadius.all(
-                                        Radius.circular(40)),
-                                    color: ThemeColor.primary,
-                                  ),
-                                )
-                                    : const SizedBox(),
-                              ],
-                            ),
+                              )
+                                  : const SizedBox(),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  }
-                ],
-              ),
+                  ),
+                }
+              ],
             ),
           ),
         ),
+      ),
     );
   }
 }
