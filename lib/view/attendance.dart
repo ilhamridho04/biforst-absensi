@@ -6,7 +6,6 @@ import 'package:attendance/view/components/developer_info.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1165,7 +1164,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               Icon(
                 Icons.list,
                 size: 16,
-                color: ThemeColor.white,
+                color: ThemeColor.primary,
               ),
               SizedBox(
                 width: 4,
@@ -1176,7 +1175,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   style: TextStyle(
                     fontFamily: "MontserratRegular",
                     fontSize: screenWidth / 24,
-                    color: ThemeColor.white,
+                    color: ThemeColor.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1191,7 +1190,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 style: TextStyle(
                   fontFamily: "MontserratRegular",
                   fontSize: screenWidth / 24,
-                  color: ThemeColor.white,
+                  color: ThemeColor.primary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1203,6 +1202,45 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               _value = value;
             });
           },
+          buttonStyleData: ButtonStyleData(
+            height: screenHeight / 16,
+            width: screenWidth / 1.3,
+            padding: const EdgeInsets.only(left: 14, right: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: ThemeColor.shadow,
+              ),
+              color: ThemeColor.white,
+            ),
+            elevation: 2,
+          ),
+          iconStyleData: const IconStyleData(
+            icon: Icon(
+              Icons.arrow_forward_ios_outlined,
+            ),
+            iconSize: 14,
+            iconEnabledColor: ThemeColor.primary,
+            iconDisabledColor: Colors.grey,
+          ),
+          dropdownStyleData: DropdownStyleData(
+            maxHeight: screenHeight / 4,
+            width: screenWidth / 1.3,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: ThemeColor.white,
+            ),
+            offset: const Offset(0, 0),
+            scrollbarTheme: ScrollbarThemeData(
+              radius: const Radius.circular(40),
+              thickness: WidgetStateProperty.all<double>(6),
+              thumbVisibility: WidgetStateProperty.all<bool>(true),
+            ),
+          ),
+          menuItemStyleData: const MenuItemStyleData(
+            height: 40,
+            padding: EdgeInsets.only(left: 14, right: 14),
+          ),
         ),
       ),
     );
