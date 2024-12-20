@@ -1,5 +1,6 @@
 import 'package:attendance/utils/utils.dart';
 import 'package:attendance/view/attendance.dart';
+import 'package:attendance/view/components/developer_info.dart';
 import 'package:attendance/view/profile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -136,162 +137,80 @@ class _HomeScreenState extends State<HomeScreen> {
           ProfileScreen(),
         ],
       )
-          : Container(
-        width: double.infinity,
-        margin: EdgeInsets.all(40.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Image(
-              image: AssetImage('assets/images/secure.png'),
+          : DeveloperInfo(nama: nama ?? "User",),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Container(
+            height: 70,
+            margin: EdgeInsets.only(
+              left: 12,
+              right: 12,
+              bottom: 24,
             ),
-            SizedBox(
-              height: 10.0,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(40)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(2, 2),
+                ),
+              ],
             ),
-            Text(
-              "Oops ada yang salah.",
-              style: TextStyle(
-                color: ThemeColor.red,
-                fontFamily: "MontserratBold",
-                fontSize: screenWidth / 20,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(
-              height: 20.0,
-            ),
-            Text(
-              "Hi $nama",
-              style: TextStyle(
-                color: ThemeColor.black,
-                fontFamily: "MontserratBold",
-                fontSize: screenWidth / 24,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(
-              height: 20.0,
-            ),
-            Container(
-              child: Html(
-                data:
-                "<p>Kami mendeteksi bahwa perangkat anda mengaktifkan <b style='color: red;'>opsi pengembang</b>.</p></p>Silahkan matikan <b style='color: red;'>opsi pengembang</b> pada perangkat anda untuk menggunakan aplikasi kami.</p>",
-                style: {
-                  "body": Style(
-                    color: ThemeColor.grey,
-                    fontFamily: "MontserratLight",
-                    fontSize: FontSize(16.0),
-                  ),
-                },
-              ),
-            ),
-            Container(
-              alignment: Alignment.center,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(40)),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  GestureDetector(
-                    child: Container(
-                      height: 45,
-                      width: 95,
-                      margin: EdgeInsets.only(top: screenHeight / 18),
-                      decoration: BoxDecoration(
-                        color: ThemeColor.red,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(30),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          "Lanjutkan",
-                          style: TextStyle(
-                            fontFamily: "MontserratBold",
-                            fontSize: screenWidth / 26,
-                            color: Colors.white,
+                  // perulangan Expanded
+                  for (int i = 0; i < navigationIcons.length; i++) ...<Expanded>{
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _currentIndex = i;
+                          });
+                        },
+                        child: Container(
+                          height: screenHeight,
+                          width: screenWidth,
+                          color: Colors.white,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  navigationIcons[i],
+                                  color: i == _currentIndex
+                                      ? ThemeColor.primary
+                                      : Colors.black54,
+                                  size: i == _currentIndex ? 32 : 26,
+                                ),
+                                i == _currentIndex
+                                    ? Container(
+                                  margin: EdgeInsets.only(top: 6),
+                                  height: 3,
+                                  width: 24,
+                                  decoration: BoxDecoration(
+                                    borderRadius: const BorderRadius.all(
+                                        Radius.circular(40)),
+                                    color: ThemeColor.primary,
+                                  ),
+                                )
+                                    : const SizedBox(),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  }
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          height: 70,
-          margin: EdgeInsets.only(
-            left: 12,
-            right: 12,
-            bottom: 24,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.all(Radius.circular(40)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 10,
-                offset: Offset(2, 2),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.all(Radius.circular(40)),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // perulangan Expanded
-                for (int i = 0; i < navigationIcons.length; i++) ...<Expanded>{
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _currentIndex = i;
-                        });
-                      },
-                      child: Container(
-                        height: screenHeight,
-                        width: screenWidth,
-                        color: Colors.white,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                navigationIcons[i],
-                                color: i == _currentIndex
-                                    ? ThemeColor.primary
-                                    : Colors.black54,
-                                size: i == _currentIndex ? 32 : 26,
-                              ),
-                              i == _currentIndex
-                                  ? Container(
-                                margin: EdgeInsets.only(top: 6),
-                                height: 3,
-                                width: 24,
-                                decoration: BoxDecoration(
-                                  borderRadius: const BorderRadius.all(
-                                      Radius.circular(40)),
-                                  color: ThemeColor.primary,
-                                ),
-                              )
-                                  : const SizedBox(),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                }
-              ],
-            ),
           ),
         ),
-      ),
     );
   }
 }

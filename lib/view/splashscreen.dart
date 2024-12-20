@@ -16,14 +16,16 @@ class SplasScreen extends StatefulWidget {
   const SplasScreen({super.key});
 
   @override
-  _SplasScreenState createState() => new _SplasScreenState();
+  State<StatefulWidget> createState() {
+    return _SplasScreenState();
+  }
 }
 
 class _SplasScreenState extends State<SplasScreen> {
   DbHelper dbHelper = DbHelper();
   Utils utils = Utils();
 
-  final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   double screenHeight = 0;
   double screenWidth = 0;
@@ -33,7 +35,7 @@ class _SplasScreenState extends State<SplasScreen> {
   String _isAlreadyDoSettings = 'no';
 
   Future selanjutnya() async {
-    settings = Settings(id: 1, url: base_url, key: "$key_app");
+    settings = Settings(id: 1, url: base_url, key: key_app);
     // Insert the settings
     insertSettings(settings!);
 
@@ -118,7 +120,7 @@ class _SplasScreenState extends State<SplasScreen> {
                 SizedBox(
                   height: 10.0,
                 ),
-                Container(
+                SizedBox(
                   height: 120,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -164,13 +166,13 @@ class _SplasScreenState extends State<SplasScreen> {
                             selanjutnya();
                           },
                           style: ButtonStyle(
-                            foregroundColor: MaterialStateProperty.all<Color>(
+                            foregroundColor: WidgetStateProperty.all<Color>(
                               Colors.white,
                             ),
-                            backgroundColor: MaterialStateProperty.all<Color>(
+                            backgroundColor: WidgetStateProperty.all<Color>(
                               ThemeColor.primary,
                             ),
-                            shape: MaterialStateProperty.all<
+                            shape: WidgetStateProperty.all<
                                 RoundedRectangleBorder>(
                               RoundedRectangleBorder(
                                 borderRadius:

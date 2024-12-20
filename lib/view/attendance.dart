@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
+import 'package:attendance/view/components/developer_info.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
@@ -112,20 +114,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> getImage() async {
     try {
-      final _image = await ImagePicker().pickImage(
+      final image = await ImagePicker().pickImage(
         source: ImageSource.camera,
         maxHeight: 1280,
         maxWidth: 720,
         preferredCameraDevice: CameraDevice.front,
       );
-      if (_image == null) return;
-      final File imageTemp = File(_image.path);
-      this._image = imageTemp;
+      if (image == null) return;
+      final File imageTemp = File(image.path);
+      _image = imageTemp;
       setState(() {
         sendData();
       });
     } on PlatformException catch (e) {
-      print('Failed to pick image: $e');
+      if (kDebugMode) {
+        print('Failed to pick image: $e');
+      }
     }
   }
 
@@ -379,13 +383,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             desc: "$attendance_show_alert-in $attendance_success_ms",
             buttons: [
               DialogButton(
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+                width: 120,
                 child: Text(
                   ok_text,
                   style: TextStyle(color: Colors.white, fontSize: 20),
                 ),
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
               )
             ],
           ).show();
@@ -418,13 +422,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             desc: "$already_check_in",
             buttons: [
               DialogButton(
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+                width: 120,
                 child: Text(
                   ok_text,
                   style: TextStyle(color: Colors.white, fontSize: 20),
                 ),
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
               )
             ],
           ).show();
@@ -669,11 +673,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (!hasPermission) return;
     await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high)
         .then((Position position) {
-      setState(() => _currentPosition = position);
-      _getAddressFromLatLng(_currentPosition!);
-      _isMock = position.isMocked;
+      setState(() {
+        _currentPosition = position;
+        _getAddressFromLatLng(_currentPosition!);
+        _isMock = position.isMocked;
+      });
     }).catchError((e) {
-      debugPrint(e);
+      if (kDebugMode) {
+        print('Error getting location: $e');
+      }
     });
   }
 
@@ -1106,97 +1114,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
         ),
       )
-          : Container(
-        width: double.infinity,
-        margin: EdgeInsets.all(40.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(8.0),
-                topRight: Radius.circular(8.0),
-              ),
-              child: Image(
-                  image: AssetImage('assets/images/location.png'),
-                  width: 150,
-                  fit: BoxFit.fill),
-            ),
-            SizedBox(
-              height: 10.0,
-            ),
-            Text(
-              "Oops ada yang salah.",
-              style: TextStyle(
-                color: ThemeColor.red,
-                fontFamily: "MontserratBold",
-                fontSize: screenWidth / 20,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(
-              height: 20.0,
-            ),
-            Text(
-              nama != null && nama!.isNotEmpty ? nama! : "Demo Biforst",
-              style: TextStyle(
-                color: ThemeColor.black,
-                fontFamily: "MontserratBold",
-                fontSize: screenWidth / 24,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(
-              height: 20.0,
-            ),
-            Html(
-              data:
-              "<p>Kami mendeteksi bahwa perangkat anda mengaktifkan <b style='color: red;'>Lokasi Palsu</b>.</p></p>Silahkan matikan <b style='color: red;'>Lokasi Palsu</b> pada perangkat anda untuk menggunakan aplikasi kami.</p>",
-              style: {
-                "body": Style(
-                  color: ThemeColor.grey,
-                  fontFamily: "MontserratLight",
-                  fontSize: FontSize(16.0),
-                ),
-              },
-            ),
-            Container(
-              alignment: Alignment.center,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () async {
-                      exit(0);
-                    },
-                    child: Container(
-                      height: 45,
-                      width: 95,
-                      margin: EdgeInsets.only(top: screenHeight / 18),
-                      decoration: BoxDecoration(
-                        color: ThemeColor.red,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(30),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          "Lanjutkan",
-                          style: TextStyle(
-                            fontFamily: "MontserratBold",
-                            fontSize: screenWidth / 26,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          : DeveloperInfo(nama: nama ?? "User"),
     );
   }
 

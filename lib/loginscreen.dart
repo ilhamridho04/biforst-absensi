@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
     var urlLogin = "https://biforst.id/api/auth/login2";
     try {
       var dio = Dio();
-      FormData formData = new FormData.fromMap({
+      FormData formData = FormData.fromMap({
         "email": email,
         "password": pass,
       });
@@ -465,7 +465,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Row(
         children: [
-          Container(
+          SizedBox(
             width: screenWidth / 6,
             child: icon,
           ),

@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       debugShowMaterialGrid: false,
-      title: 'BIFORST ABSENSI',
+      title: 'Attendance App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
