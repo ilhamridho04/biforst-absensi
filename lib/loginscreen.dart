@@ -116,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
     var urlLogin = "https://biforst.cbnet.my.id/api/auth/login2";
     try {
       var dio = Dio();
-      FormData formData = new FormData.fromMap({
+      FormData formData = FormData.fromMap({
         "email": email,
         "password": pass,
       });
@@ -517,7 +517,14 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       case LoginStatus.signIn:
-        return HomeScreen();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreen()),
+                (Route<dynamic> route) => false,
+          );
+        });
+        return Container();
     }
   }
 

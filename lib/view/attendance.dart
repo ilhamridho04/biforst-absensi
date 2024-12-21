@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:attendance/view/components/show_alert_dialog.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -38,7 +37,7 @@ class AttendanceScreen extends StatefulWidget {
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> {
+class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBindingObserver {
   late TargetPlatform? platform;
 
   bool isMockLocation = false;
@@ -107,7 +106,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   void initState() {
     super.initState();
-
+    WidgetsBinding.instance.addObserver(this);
     getSetting();
     initPlatformState();
     _toggleServiceStatusStream();
@@ -115,12 +114,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   void dispose() {
-    if (_positionStreamSubscription != null) {
-      _positionStreamSubscription!.cancel();
-      _positionStreamSubscription = null;
-    }
+    WidgetsBinding.instance.removeObserver(this);
+    _positionStreamSubscription?.cancel();
     _timer.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _positionStreamSubscription?.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      _positionStreamSubscription?.resume();
+    }
   }
 
   Future<void> getImage() async {
@@ -144,16 +150,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-// Send data post via http
+  // Send data post via http
   Future<void> sendData() async {
     if (_value == null) {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          utils.showAlertDialog(
-              '$select_area', "warning", AlertType.warning, context, true);
-        });
-      });
-      return;
+      utils.showAlertDialog(
+          "Pilih area terlebih dahulu !", "warning", AlertType.warning, context, true);
     }
     var dataKey = getKey;
     String? fileName = _image!.path.split('/').last;
@@ -199,8 +200,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     pd.close();
 
     var data = response.data;
-    print("Ini data : $data");
-    handleResponse(context, data, uid.toString(), cekKehadiran);
+    print("Ini data : " + data.toString());
+    setState(() {
+      handleResponse(data, uid.toString(), cekKehadiran);
+    });
   }
 
   Future<void> _cekOut() async {
@@ -238,141 +241,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         );
       },
     );
-
-    var data = response.data;
-    handleResponse(context, data, uid.toString(), cekKehadiran);
     pd.close();
-  }
-
-  void handleResponse(BuildContext context, dynamic data, String uid, Function cekKehadiran) {
-    if (data['message'] == 'Success!') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          String urlCekhadir = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-          cekKehadiran(urlCekhadir);
-          Attendance attendance = Attendance(
-            id: data['id'],
-            date: data['date'],
-            time: data['time'],
-            location: data['location'],
-            type: data['query'],
-          );
-
-          // Insert the attendance
-          insertAttendance(attendance);
-          _positionStreamSubscription!.cancel();
-
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.success,
-            title: "Success",
-            description: "$attendance_show_alert-in $attendance_success_ms",
-            buttonText: ok_text,
-          );
-        });
-      });
-    } else if (data['message'] == 'key_not_valid') {
-      showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return CustomDialogBox(
-              title: "Pembaruan tersedia !",
-              descriptions: key_not_valid,
-              img: Image.asset('assets/images/logo.png'),
-              btn: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    isUpdate = true;
-                  });
-                  Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (context) => DownloadsPage())
-                  );
-                },
-                child: Text(
-                  "Download",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontFamily: "MontserratRegular",
-                  ),
-                ),
-              ),
-            );
-          }
-      );
-    } else if (data['message'] == 'cannot_attend') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.warning,
-            title: "Warning",
-            description: outside_area,
-            buttonText: ok_text,
-          );
-        });
-      });
-    } else if (data['message'] == 'location_not_found') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.warning,
-            title: "Warning",
-            description: location_not_found,
-            buttonText: ok_text,
-          );
-        });
-      });
-    } else if (data['message'] == 'sudah_cek_in') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          _positionStreamSubscription!.cancel();
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.info,
-            title: "Berhasil",
-            description: already_check_in,
-            buttonText: ok_text,
-          );
-        });
-      });
-    } else if (data['message'] == 'check_in_first') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.warning,
-            title: "Warning",
-            description: check_in_first,
-            buttonText: ok_text,
-          );
-        });
-      });
-    } else if (data['message'] == 'error_something_went_wrong') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.error,
-            title: "Error",
-            description: attendance_error_server,
-            buttonText: ok_text,
-          );
-        });
-      });
-    } else {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          ShowAlertDialog(
-            context: context,
-            type: AlertType.error,
-            title: "Error",
-            description: data.toString(),
-            buttonText: ok_text,
-          );
-        });
-      });
-    }
+    var data = response.data;
+    setState(() {
+      handleResponse(data, uid.toString(), cekKehadiran);
+    });
   }
 
   insertAttendance(Attendance object) async {
@@ -501,6 +374,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     final position = await _geolocatorPlatform.getCurrentPosition();
     _getAddressFromLatLng(position);
+    print("Ini posisi : " + position.toString());
     _updatePositionList(
       _PositionItemType.position,
       position.toString(),
@@ -1063,6 +937,73 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       )
       ,
     );
+  }
+
+  Future<void> handleResponse(dynamic data, String uid, Function cekKehadiran) async {
+    if (data['message'] == 'Success!') {
+      setState(() {
+        String urlCekhadir = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+        cekKehadiran(urlCekhadir);
+        Attendance attendance = Attendance(
+          id: data['id'],
+          date: data['date'],
+          time: data['time'],
+          location: data['location'],
+          type: data['query'],
+        );
+
+        // Insert the attendance
+        insertAttendance(attendance);
+      });
+      utils.showAlertDialog(
+          "Berhasil melakukan absensi !", "Success", AlertType.success, context, true);
+    } else if (data['message'] == 'key_not_valid') {
+      showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return CustomDialogBox(
+              title: "Pembaruan tersedia !",
+              descriptions: key_not_valid,
+              img: Image.asset('assets/images/logo.png'),
+              btn: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    isUpdate = true;
+                  });
+                  Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (context) => DownloadsPage())
+                  );
+                },
+                child: Text(
+                  "Download",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontFamily: "MontserratRegular",
+                  ),
+                ),
+              ),
+            );
+          }
+      );
+    } else if (data['message'] == 'cannot_attend') {
+      utils.showAlertDialog(
+          "Anda tidak bisa absen di area ini !", "Warning", AlertType.warning, context, true);
+    } else if (data['message'] == 'location_not_found') {
+      utils.showAlertDialog(
+          "Lokasi tidak ditemukan !", "Warning", AlertType.warning, context, true);
+    } else if (data['message'] == 'sudah_cek_in') {
+      utils.showAlertDialog(
+          "Anda sudah absen hari ini !", "Info", AlertType.info, context, true);
+    } else if (data['message'] == 'check_in_first') {
+      utils.showAlertDialog(
+          "Anda harus absen masuk terlebih dahulu !", "Warning", AlertType.warning, context, true);
+    } else if (data['message'] == 'error_something_went_wrong') {
+      utils.showAlertDialog(
+          "Terjadi kesalahan !", "Error", AlertType.error, context, true);
+    } else {
+      utils.showAlertDialog(
+          "Terjadi kesalahan !", "Error", AlertType.error, context, true);
+    }
   }
 
   Widget _aktivitasSelesai() {
