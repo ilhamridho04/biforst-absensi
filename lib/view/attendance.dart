@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:android_intent_plus/android_intent.dart';
-import 'package:attendance/view/components/developer_info.dart';
+import 'package:attendance/view/components/show_alert_dialog.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -11,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
@@ -50,6 +48,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool isDevelopmentModeEnable = false;
   bool _isInitInProgress = false;
 
+  static const String _kLocationServicesDisabledMessage =
+      'Location services are disabled.';
+  static const String _kPermissionDeniedMessage = 'Permission denied.';
+  static const String _kPermissionDeniedForeverMessage =
+      'Permission denied forever.';
+  static const String _kPermissionGrantedMessage = 'Permission granted.';
+
+  final GeolocatorPlatform _geolocatorPlatform = GeolocatorPlatform.instance;
+  final List<_PositionItem> _positionItems = <_PositionItem>[];
+  StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription<ServiceStatus>? _serviceStatusStreamSubscription;
+  bool positionStreamStarted = false;
+
+
   String? nik = "",
       nama = "",
       email = "",
@@ -83,7 +95,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   late ProgressDialog pd;
   late bool clickButton = false, isLoading = true;
   bool isUpdate = false;
-  var subscription, getId, _value;
+  var _value;
   double setAccuracy = 200.0;
   File? _image, newImage;
 
@@ -98,10 +110,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     getSetting();
     initPlatformState();
+    _toggleServiceStatusStream();
   }
 
   @override
   void dispose() {
+    if (_positionStreamSubscription != null) {
+      _positionStreamSubscription!.cancel();
+      _positionStreamSubscription = null;
+    }
     _timer.cancel();
     super.dispose();
   }
@@ -132,17 +149,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (_value == null) {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          // Alert Dialog
           utils.showAlertDialog(
               '$select_area', "warning", AlertType.warning, context, true);
         });
       });
       return;
     }
-    // Get info for attendance
     var dataKey = getKey;
     String? fileName = _image!.path.split('/').last;
-    // Add data to map
     Map<String, dynamic> body = {
       'key': dataKey,
       'worker_id': uid,
@@ -153,7 +167,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       'absen_area': _currentAddress,
       'file': await MultipartFile.fromFile(_image!.path, filename: fileName),
     };
-    // Sending the data to server
     String url = utils.getRealUrl(getUrl!, getPath!);
     Dio dio = Dio();
     FormData formData = FormData.fromMap(body);
@@ -163,7 +176,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     pd.show(
       max: 100,
       msg: 'Sedang upload gambar...',
-      progressType: ProgressType.valuable,
       backgroundColor: ThemeColor.white,
       progressValueColor: ThemeColor.primary,
       progressBgColor: Colors.white70,
@@ -188,46 +200,78 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     var data = response.data;
     print("Ini data : $data");
-    // Show response from server via snackBar
+    handleResponse(context, data, uid.toString(), cekKehadiran);
+  }
+
+  Future<void> _cekOut() async {
+    var dataKey = getKey;
+    Map<String, dynamic> body = {
+      'key': dataKey,
+      'worker_id': uid,
+      'q': 'out',
+      'lat': _currentPosition!.latitude,
+      'longt': _currentPosition!.longitude,
+      'absen_area': _currentAddress,
+    };
+    final uri = utils.getRealUrl(getUrl!, getPath!);
+    Dio dio = Dio();
+    FormData formData = FormData.fromMap(body);
+
+    ProgressDialog pd = ProgressDialog(context: context);
+    pd.show(
+      max: 100,
+      msg: 'Hampir selesai...',
+      completed: Completed(
+        completedMsg: "Absen selesai !",
+      ),
+    );
+
+    final response = await dio.post(
+      uri,
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+      onSendProgress: (rec, total) {
+        int progress = (((rec / total) * 100).toInt());
+        pd.update(
+          value: progress,
+          msg: 'Mengirim file...',
+        );
+      },
+    );
+
+    var data = response.data;
+    handleResponse(context, data, uid.toString(), cekKehadiran);
+    pd.close();
+  }
+
+  void handleResponse(BuildContext context, dynamic data, String uid, Function cekKehadiran) {
     if (data['message'] == 'Success!') {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          String urlCekhadir =
-          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+          String urlCekhadir = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
           cekKehadiran(urlCekhadir);
           Attendance attendance = Attendance(
             id: data['id'],
             date: data['date'],
             time: data['time'],
             location: data['location'],
-            type: "Check-In",
+            type: data['query'],
           );
 
           // Insert the attendance
           insertAttendance(attendance);
-          subscription.cancel();
+          _positionStreamSubscription!.cancel();
 
-          Alert(
+          ShowAlertDialog(
             context: context,
             type: AlertType.success,
             title: "Success",
-            desc: "$attendance_show_alert-in $attendance_success_ms",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
+            description: "$attendance_show_alert-in $attendance_success_ms",
+            buttonText: ok_text,
+          );
         });
       });
     } else if (data['message'] == 'key_not_valid') {
-      // Alert Dialog
       showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -258,206 +302,77 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     } else if (data['message'] == 'cannot_attend') {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              outside_area, "warning", AlertType.warning, context, true);
+          ShowAlertDialog(
+            context: context,
+            type: AlertType.warning,
+            title: "Warning",
+            description: outside_area,
+            buttonText: ok_text,
+          );
         });
       });
     } else if (data['message'] == 'location_not_found') {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              location_not_found, "warning", AlertType.warning, context, true);
+          ShowAlertDialog(
+            context: context,
+            type: AlertType.warning,
+            title: "Warning",
+            description: location_not_found,
+            buttonText: ok_text,
+          );
         });
       });
     } else if (data['message'] == 'sudah_cek_in') {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          subscription.cancel();
-          Alert(
+          _positionStreamSubscription!.cancel();
+          ShowAlertDialog(
             context: context,
             type: AlertType.info,
             title: "Berhasil",
-            desc: "$already_check_in",
-            buttons: [
-              DialogButton(
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-              )
-            ],
-          ).show();
+            description: already_check_in,
+            buttonText: ok_text,
+          );
         });
       });
     } else if (data['message'] == 'check_in_first') {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              check_in_first, "warning", AlertType.warning, context, true);
+          ShowAlertDialog(
+            context: context,
+            type: AlertType.warning,
+            title: "Warning",
+            description: check_in_first,
+            buttonText: ok_text,
+          );
         });
       });
     } else if (data['message'] == 'error_something_went_wrong') {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              attendance_error_server, "Error", AlertType.error, context, true);
+          ShowAlertDialog(
+            context: context,
+            type: AlertType.error,
+            title: "Error",
+            description: attendance_error_server,
+            buttonText: ok_text,
+          );
         });
       });
     } else {
       Future.delayed(Duration(seconds: 0)).then((value) {
         setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(response.data.toString(), "Error",
-              AlertType.error, context, true);
+          ShowAlertDialog(
+            context: context,
+            type: AlertType.error,
+            title: "Error",
+            description: data.toString(),
+            buttonText: ok_text,
+          );
         });
       });
     }
-  }
-
-  Future<void> _cekOut() async {
-    // pr.show();
-    // Get info for attendance
-    var dataKey = getKey;
-    // Add data to map
-    Map<String, dynamic> body = {
-      'key': dataKey,
-      'worker_id': uid,
-      'q': 'out',
-      'lat': _currentPosition!.latitude,
-      'longt': _currentPosition!.longitude,
-      'absen_area': _currentAddress,
-    };
-    // Sending the data to server
-    final uri = utils.getRealUrl(getUrl!, getPath!);
-    Dio dio = Dio();
-    FormData formData = FormData.fromMap(body);
-
-    ProgressDialog pd = ProgressDialog(context: context);
-    pd.show(
-      max: 100,
-      msg: 'Hampir selesai...',
-      progressType: ProgressType.valuable,
-      completed: Completed(
-        completedMsg: "Absen selesai !",
-        // completedImage: AssetImage(
-        //   widget.future,
-        // ),
-      ),
-    );
-
-    final response = await dio.post(
-      uri,
-      data: formData,
-      options: Options(contentType: 'multipart/form-data'),
-      onSendProgress: (rec, total) {
-        int progress = (((rec / total) * 100).toInt());
-        pd.update(
-          value: progress,
-          msg: 'Mengirim file...',
-        );
-      },
-    );
-
-    var data = response.data;
-    // Show response from server via snackBar
-    if (data['message'] == 'Success!') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          String urlCekhadir =
-          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-          cekKehadiran(urlCekhadir);
-          subscription.cancel();
-          Alert(
-            context: context,
-            type: AlertType.success,
-            title: "Success",
-            desc: "$attendance_show_alert-in $attendance_success_ms",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
-        });
-      });
-    } else if (data['message'] == 'cannot_attend') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              outside_area, "warning", AlertType.warning, context, true);
-        });
-      });
-    } else if (data['message'] == 'location_not_found') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              location_not_found, "warning", AlertType.warning, context, true);
-        });
-      });
-    } else if (data['message'] == 'sudah_cek_in') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          subscription.cancel();
-          Alert(
-            context: context,
-            type: AlertType.info,
-            title: "Berhasil",
-            desc: "$already_check_in",
-            buttons: [
-              DialogButton(
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(),
-                width: 120,
-                child: Text(
-                  ok_text,
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-              )
-            ],
-          ).show();
-        });
-      });
-    } else if (data['message'] == 'check_in_first') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              check_in_first, "warning", AlertType.warning, context, true);
-        });
-      });
-    } else if (data['message'] == 'error_something_went_wrong') {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(
-              attendance_error_server, "Error", AlertType.error, context, true);
-        });
-      });
-    } else {
-      Future.delayed(Duration(seconds: 0)).then((value) {
-        setState(() {
-          // Alert Dialog
-          utils.showAlertDialog(response.data.toString(), "Error",
-              AlertType.error, context, true);
-        });
-      });
-    }
-    pd.close();
   }
 
   insertAttendance(Attendance object) async {
@@ -570,35 +485,164 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         print('Error initializing platform state: $error');
       }
     } finally {
-      await fetchCurrentPosition();
       setState(() {
+        _getCurrentPosition();
         _isInitInProgress = false;
       });
     }
   }
 
-  Future<void> fetchCurrentPosition() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _currentPosition = position;
-        _getAddressFromLatLng(_currentPosition!);
-      });
-    } catch (error) {
-      if (kDebugMode) {
-        print('Error fetching current position: $error');
+  Future<void> _getCurrentPosition() async {
+    final hasPermission = await _handlePermission();
+
+    if (!hasPermission) {
+      return;
+    }
+
+    final position = await _geolocatorPlatform.getCurrentPosition();
+    _getAddressFromLatLng(position);
+    _updatePositionList(
+      _PositionItemType.position,
+      position.toString(),
+    );
+  }
+
+  Future<bool> _handlePermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await _geolocatorPlatform.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      // Location services are not enabled don't continue
+      // accessing the position and request users of the
+      // App to enable the location services.
+      _updatePositionList(
+        _PositionItemType.log,
+        _kLocationServicesDisabledMessage,
+      );
+
+      return false;
+    }
+
+    permission = await _geolocatorPlatform.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await _geolocatorPlatform.requestPermission();
+      if (permission == LocationPermission.denied) {
+        // Permissions are denied, next time you could try
+        // requesting permissions again (this is also where
+        // Android's shouldShowRequestPermissionRationale
+        // returned true. According to Android guidelines
+        // your App should show an explanatory UI now.
+        _updatePositionList(
+          _PositionItemType.log,
+          _kPermissionDeniedMessage,
+        );
+
+        return false;
       }
     }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Permissions are denied forever, handle appropriately.
+      _updatePositionList(
+        _PositionItemType.log,
+        _kPermissionDeniedForeverMessage,
+      );
+
+      return false;
+    }
+
+    // When we reach here, permissions are granted and we can
+    // continue accessing the position of the device.
+    _updatePositionList(
+      _PositionItemType.log,
+      _kPermissionGrantedMessage,
+    );
+    return true;
+  }
+
+  void _updatePositionList(_PositionItemType type, String displayValue) {
+    _positionItems.add(_PositionItem(type, displayValue));
+    setState(() {});
+  }
+
+  void _toggleServiceStatusStream() {
+    if (_serviceStatusStreamSubscription == null) {
+      final serviceStatusStream = _geolocatorPlatform.getServiceStatusStream();
+      _serviceStatusStreamSubscription =
+          serviceStatusStream.handleError((error) {
+            _serviceStatusStreamSubscription?.cancel();
+            _serviceStatusStreamSubscription = null;
+          }).listen((serviceStatus) {
+            String serviceStatusValue;
+            if (serviceStatus == ServiceStatus.enabled) {
+              if (positionStreamStarted) {
+                _toggleListening();
+              }
+              serviceStatusValue = 'enabled';
+            } else {
+              if (_positionStreamSubscription != null) {
+                setState(() {
+                  _positionStreamSubscription?.cancel();
+                  _positionStreamSubscription = null;
+                  _updatePositionList(
+                      _PositionItemType.log, 'Position Stream has been canceled');
+                });
+              }
+              serviceStatusValue = 'disabled';
+            }
+            _updatePositionList(
+              _PositionItemType.log,
+              'Location service has been $serviceStatusValue',
+            );
+          });
+    }
+  }
+
+  void _toggleListening() {
+    if (_positionStreamSubscription == null) {
+      final positionStream = _geolocatorPlatform.getPositionStream();
+      _positionStreamSubscription = positionStream.handleError((error) {
+        _positionStreamSubscription?.cancel();
+        _positionStreamSubscription = null;
+      }).listen((position) => _updatePositionList(
+        _PositionItemType.position,
+        position.toString(),
+      ));
+      _positionStreamSubscription?.pause();
+    }
+
+    setState(() {
+      if (_positionStreamSubscription == null) {
+        return;
+      }
+
+      String statusDisplayValue;
+      if (_positionStreamSubscription!.isPaused) {
+        _positionStreamSubscription!.resume();
+        statusDisplayValue = 'resumed';
+      } else {
+        _positionStreamSubscription!.pause();
+        statusDisplayValue = 'paused';
+      }
+
+      _updatePositionList(
+        _PositionItemType.log,
+        'Listening for position updates $statusDisplayValue',
+      );
+    });
   }
 
   Future<void> _getAddressFromLatLng(Position position) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude
+          position.latitude,
+          position.longitude
       );
       Placemark place = placemarks[0];
       setState(() {
+        _currentPosition = position;
         _currentAddress = '${place.subLocality}, ${place.locality}, ${place.administrativeArea}, ${place.postalCode}';
       });
     } catch (e) {
@@ -725,7 +769,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                          color: ThemeColor.red.withOpacity(0.20),
+                          color: ThemeColor.shadow,
                           borderRadius: BorderRadius.circular(12)),
                       child: const Center(
                         child: Icon(
@@ -1167,4 +1211,18 @@ class TaskInfo {
   String? taskId;
   int? progress = 0;
   DownloadTaskStatus? status = DownloadTaskStatus.undefined;
+}
+
+
+
+enum _PositionItemType {
+  log,
+  position,
+}
+
+class _PositionItem {
+  _PositionItem(this.type, this.displayValue);
+
+  final _PositionItemType type;
+  final String displayValue;
 }

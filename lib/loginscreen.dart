@@ -1,4 +1,3 @@
-import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:attendance/utils/strings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -171,7 +170,9 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() {
             Future.delayed(Duration(seconds: 0)).then((value) {
               pr.hide().whenComplete(() {
-                print(pr.isShowing());
+                if (kDebugMode) {
+                  print(pr.isShowing());
+                }
               });
               Alert(
                   context: context,
@@ -222,12 +223,14 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       }
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (fromWhere == 'clickButton') {
         setState(() {
           Future.delayed(Duration(seconds: 0)).then((value) {
             pr.hide().whenComplete(() {
-              print(pr.isShowing());
+              if (kDebugMode) {
+                print(pr.isShowing());
+              }
             });
             Alert(
                 context: context,
@@ -463,14 +466,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () => loginBtn(),
                               style: ButtonStyle(
                                 foregroundColor:
-                                MaterialStateProperty.all<Color>(
+                                WidgetStateProperty.all<Color>(
                                   Colors.white,
                                 ),
                                 backgroundColor:
-                                MaterialStateProperty.all<Color>(
+                                WidgetStateProperty.all<Color>(
                                   ThemeColor.primary,
                                 ),
-                                shape: MaterialStateProperty.all<
+                                shape: WidgetStateProperty.all<
                                     RoundedRectangleBorder>(
                                   RoundedRectangleBorder(
                                     borderRadius:
