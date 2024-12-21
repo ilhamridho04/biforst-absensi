@@ -11,8 +11,6 @@ import 'package:progress_dialog_null_safe/progress_dialog_null_safe.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
-import 'controller/custom_dialog_box.dart';
 import 'database/db_helper.dart';
 import 'homescreen.dart';
 import 'model/colors.dart';
@@ -29,7 +27,7 @@ class LoginScreen extends StatefulWidget {
 enum LoginStatus { notSignIn, signIn, doubleCheck }
 
 class _LoginScreenState extends State<LoginScreen> {
-    // Global key scaffold
+  // Global key scaffold
   final _key = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -47,9 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
   DbHelper dbHelper = DbHelper();
   late ProgressDialog pr;
   bool _secureText = true;
-  bool isError = false;
-
-  late String errorTitle, errorMessage;
 
   Color primary = Colors.blue;
 
@@ -60,29 +55,9 @@ class _LoginScreenState extends State<LoginScreen> {
     getPermissionAttendance();
   }
 
-  showHide() {
-    setState(() {
-      _secureText = !_secureText;
-    });
-  }
-
-  void check() async {
-    final form = _key.currentState;
-    if (form!.validate()) {
-      form.save();
-      login('clickButton');
-    }
-  }
-
-  void getSettings() async {
-    var getSettings = await dbHelper.getSettings(1);
-    var getUser = await dbHelper.getUser(1);
-    setState(() {
-      getUrl = getSettings.url;
-      getKey = getSettings.key;
-      email = getUser.email;
-    });
-    getPref();
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> getPermissionAttendance() async {
@@ -112,12 +87,37 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  showHide() {
+    setState(() {
+      _secureText = !_secureText;
+    });
+  }
+
+  void check() async {
+    final form = _key.currentState;
+    if (form != null && form.validate()) {
+      form.save();
+      login('clickButton');
+    }
+  }
+
+  void getSettings() async {
+    var getSettings = await dbHelper.getSettings(1);
+    var getUser = await dbHelper.getUser(1);
+    setState(() {
+      getUrl = getSettings.url;
+      getKey = getSettings.key;
+      email = getUser.email;
+    });
+    getPref();
+  }
+
   void login(String fromWhere) async {
     if (fromWhere == 'clickButton') pr.show();
     var urlLogin = "https://biforst.cbnet.my.id/api/auth/login2";
     try {
       var dio = Dio();
-      FormData formData = FormData.fromMap({
+      FormData formData = new FormData.fromMap({
         "email": email,
         "password": pass,
       });
@@ -126,14 +126,18 @@ class _LoginScreenState extends State<LoginScreen> {
         data: formData,
         options: Options(
           receiveDataWhenStatusError: true,
-          sendTimeout: Duration(seconds: 60), // 60 seconds
+          validateStatus: (status) {
+            return status! < 500;
+          },
         ),
       );
 
       var data = response.data;
+      pr.hide().whenComplete(() {
+        print(pr.isShowing());
+      });
       String message = data['message'];
       String pesan = data['pesan'];
-      pr.hide();
       if (message == 'success') {
         isLogged = statusLogged;
         uid = data['user']['id'];
@@ -151,48 +155,104 @@ class _LoginScreenState extends State<LoginScreen> {
           role: role!,
           status: 1,
         );
-
         setState(() {
-          Future.delayed(Duration(seconds: 2)).then((value) {
+          Future.delayed(Duration(seconds: 0)).then((value) {
             pr.hide().whenComplete(() {
-              if (kDebugMode) {
-                print(pr.isShowing());
-              }
+              print(pr.isShowing());
             });
             Settings updateSettings =
-            Settings(id: 1, url: base_url, key: key_app);
+            Settings(id: 1, url: "$base_url", key: "$key_app");
             dbHelper.updateSettings(updateSettings);
             updateUser(user);
           });
         });
       } else {
-        setState(() {
-          errorTitle = message;
-          errorMessage = pesan;
-          isError = true;
-
-        });
-        showErrorAlert(message, pesan);
+        if (fromWhere == 'clickButton') {
+          setState(() {
+            Future.delayed(Duration(seconds: 0)).then((value) {
+              pr.hide().whenComplete(() {
+                print(pr.isShowing());
+              });
+              Alert(
+                  context: context,
+                  type: AlertType.error,
+                  title: message.toUpperCase(),
+                  desc: pesan,
+                  buttons: [
+                    DialogButton(
+                      onPressed: () => Navigator.pop(context),
+                      width: 75,
+                      child: Text(
+                        "Ok",
+                        style: TextStyle(color: Colors.white, fontSize: 20),
+                      ),
+                    ),
+                  ]).show();
+            });
+          });
+        } else {
+          if (fromWhere == 'clickButton') {
+            setState(() {
+              Future.delayed(Duration(seconds: 0)).then((value) {
+                pr.hide().whenComplete(() {
+                  print(pr.isShowing());
+                });
+                Alert(
+                    context: context,
+                    type: AlertType.error,
+                    title: message,
+                    desc: pesan,
+                    buttons: [
+                      DialogButton(
+                        onPressed: () => Navigator.pop(context),
+                        width: 75,
+                        child: Text(
+                          "Ok",
+                          style: TextStyle(color: Colors.white, fontSize: 20),
+                        ),
+                      ),
+                    ]).show();
+              });
+            });
+          } else {
+            setState(() {
+              _loginStatus = LoginStatus.notSignIn;
+              removePref();
+            });
+          }
+        }
       }
-    } on DioError catch (ex) {
-      handleDioError(ex);
-    } finally {
-      setState(() {
-        pr.hide();
-      });
+    } on DioError catch (e) {
+      if (fromWhere == 'clickButton') {
+        setState(() {
+          Future.delayed(Duration(seconds: 0)).then((value) {
+            pr.hide().whenComplete(() {
+              print(pr.isShowing());
+            });
+            Alert(
+                context: context,
+                type: AlertType.error,
+                title: "Error".toUpperCase(),
+                desc: e.message,
+                buttons: [
+                  DialogButton(
+                    onPressed: () => Navigator.pop(context),
+                    width: 75,
+                    child: Text(
+                      "Ok",
+                      style: TextStyle(color: Colors.white, fontSize: 20),
+                    ),
+                  ),
+                ]).show();
+          });
+        });
+      } else {
+        setState(() {
+          _loginStatus = LoginStatus.notSignIn;
+          removePref();
+        });
+      }
     }
-  }
-
-  void handleDioError(DioError ex) {
-    String? errorMessage;
-    if (ex.type == DioErrorType.connectionTimeout) {
-      errorMessage = "Connection Timeout Exception";
-    } else if (ex.type == DioErrorType.receiveTimeout) {
-      errorMessage = "Receive Timeout Exception";
-    } else {
-      errorMessage = ex.message;
-    }
-    throw Exception(errorMessage);
   }
 
   void getPref() async {
@@ -245,16 +305,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void updateUser(User object) async {
     await dbHelper.updateUser(object);
-    if (mounted) {
-      setState(() {
-        goToMainMenu();
-      });
-    }
+    Future.delayed(Duration(seconds: 0)).then((value) {
+      if (mounted) {
+        setState(() {
+          goToMainMenu();
+        });
+      }
+    });
   }
 
   void goToMainMenu() {
     _loginStatus = LoginStatus.signIn;
-    savePref(isLogged!, email!, pass!, uid!, key_app);
+    savePref(isLogged!, email!, pass!, uid!, "$key_app");
     // Navigator.of(context).pop();
   }
 
@@ -278,32 +340,16 @@ class _LoginScreenState extends State<LoginScreen> {
     preferences.setInt("id", 0);
   }
 
-  void showErrorAlert(String title, String desc) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return CustomDialogBox(
-          title: title,
-          descriptions: desc,
-          img: Image.asset('assets/images/logo.png'),
-          btn: ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text(
-              "Ok",
-              style: TextStyle(
-                fontSize: 18,
-                fontFamily: "MontserratRegular",
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    final bool isKeyboardVisible =
+    KeyboardVisibilityProvider.isKeyboardVisible(context);
+    screenHeight = MediaQuery.of(context).size.height;
+    screenWidth = MediaQuery.of(context).size.width;
 
-  void initProgressDialog(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: ThemeColor.primary,
+    ));
     pr = ProgressDialog(context,
         type: ProgressDialogType.normal, isDismissible: false, showLogs: false);
     pr.style(
@@ -326,30 +372,6 @@ class _LoginScreenState extends State<LoginScreen> {
           fontFamily: "MontserratRegular",
           fontSize: screenWidth / 24,
         ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isKeyboardVisible =
-    KeyboardVisibilityProvider.isKeyboardVisible(context);
-    screenHeight = MediaQuery.of(context).size.height;
-    screenWidth = MediaQuery.of(context).size.width;
-
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: ThemeColor.primary,
-    ));
-
-    if (isError) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        showErrorAlert(errorTitle, errorMessage);
-        setState(() {
-          isError = false;
-        });
-      });
-    }
-
-    initProgressDialog(context);
-
     switch (_loginStatus) {
       case LoginStatus.notSignIn:
         return Scaffold(
@@ -525,7 +547,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Row(
         children: [
-          SizedBox(
+          Container(
             width: screenWidth / 6,
             child: icon,
           ),
