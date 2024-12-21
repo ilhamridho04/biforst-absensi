@@ -163,8 +163,6 @@ class _LoginScreenState extends State<LoginScreen> {
           errorTitle = message;
           errorMessage = pesan;
           isError = true;
-          _loginStatus = LoginStatus.notSignIn;
-          removePref();
         });
         showErrorAlert(message, pesan);
       }

@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:android_intent_plus/android_intent.dart';
-import 'package:attendance/view/components/developer_info.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -11,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
@@ -102,7 +99,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   void dispose() {
-    _timer.cancel();
+    if(_timer.isActive) {
+      _timer.cancel();
+    }
     super.dispose();
   }
 
@@ -188,7 +187,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     // Show response from server via snackBar
     if (data['message'] == 'Success!') {
       String urlCekhadir =
-      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
       await cekKehadiran(urlCekhadir);
 
       setState(() {
@@ -203,23 +202,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         // Insert the attendance
         insertAttendance(attendance);
         subscription.cancel();
-        Alert(
-          context: context,
-          type: AlertType.success,
-          title: "Success",
-          desc: "$attendance_show_alert-in $attendance_success_ms",
-          buttons: [
-            DialogButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-              width: 120,
-              child: Text(
-                ok_text,
-                style: TextStyle(color: Colors.white, fontSize: 20),
-              ),
-            )
-          ],
-        ).show();
+        utils.showAlertDialog(
+            attendance_success_ms, "success", AlertType.success, context, true);
       });
     } else if (data['message'] == 'key_not_valid') {
       // Alert Dialog
@@ -437,39 +421,52 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   void getSetting() async {
     var getSettings = await dbHelper.getSettings(1);
     var getUser = await dbHelper.getUser(1);
+    await getAreaApi();
     setState(() {
+      isLoading = true;
       getUrl = getSettings.url;
       getKey = getSettings.key;
       email = getUser.email;
       nama = getUser.nama;
       uid = getUser.uid;
       statusLogin = getUser.status;
-      getAreaApi();
     });
   }
 
-  void getAreaApi() async {
+  Future<void> getAreaApi() async {
     final uri = utils.getRealUrl(getUrl!, getPathArea!);
     Dio dio = Dio();
-    final response = await dio.get(uri);
+    try {
+      final response = await dio.get(uri);
+      var data = response.data;
 
-    var data = response.data;
-
-    if (data['message'] == 'success') {
-      final uri =
-      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
-      await cekKehadiran(uri);
-      setState(() {
-        dataArea = data['area'];
-      });
-    } else {
-      final uri =
-      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-      await cekKehadiran(uri);
+      if (data['message'] == 'success') {
+        final uri = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+        await cekKehadiran(uri);
+        setState(() {
+          dataArea = data['area'];
+        });
+      } else {
+        final uri = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+        await cekKehadiran(uri);
+        setState(() {
+          dataArea = [
+            {"id": 0, "name": "No Data Area"}
+          ];
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching area data: $e');
+      }
       setState(() {
         dataArea = [
-          {"id": 0, "name": "No Data Area"}
+          {"id": 0, "name": "Error fetching data"}
         ];
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
       });
     }
   }
@@ -477,7 +474,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Future<void> cekKehadiran(url) async {
     Dio dio = Dio();
     final response = await dio.get(url);
-    final data = response.data;
+    var data = response.data;
     setState(() {
       if (data['message'] == "sudah_cek_in") {
         _tanggalMasuk = data['user']['tanggal'];
@@ -551,12 +548,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       setState(() {
         _currentPosition = position;
-        _getAddressFromLatLng(_currentPosition!);
       });
+      await _getAddressFromLatLng(position);
     } catch (error) {
       if (kDebugMode) {
         print('Error fetching current position: $error');
       }
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -616,7 +617,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: isLoading && _isInitInProgress
+      body: isLoading || _isInitInProgress || dataArea.isEmpty
           ? Center(
         child: LoadingAnimationWidget.discreteCircle(
           color: ThemeColor.primary,

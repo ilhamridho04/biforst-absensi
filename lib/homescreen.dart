@@ -61,7 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    getSetting();
     initPlatformState();
     crossFadeState = CrossFadeState.showFirst;
   }
@@ -104,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isSafeDevice = sd;
         isDevelopmentModeEnable = dme;
         if (kDebugMode) {
-          print('Ini Attendance : \nisMockLocation: $isMockLocation'
+          print('Ini Home : \nisMockLocation: $isMockLocation'
               '\nisRealDevice: $isRealDevice'
               '\nisOnExternalStorage: $isOnExternalStorage'
               '\nisSafeDevice: $isSafeDevice'
@@ -128,17 +127,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text((await permission.serviceStatus).toString()),
     ));
-  }
-
-  void getSetting() async {
-    var getSettings = await dbHelper.getSettings(1);
-    var getUser = await dbHelper.getUser(1);
-    setState(() {
-      getUrl = getSettings.url;
-      getKey = getSettings.key;
-      email = getUser.email;
-      nama = getUser.nama;
-    });
   }
 
   @override
