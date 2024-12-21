@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
       String pesan = data['pesan'];
       pr.hide();
       if (message == 'success') {
-
+        isLogged = statusLogged;
         uid = data['user']['id'];
         nik = data['user']['nik'];
         nama = data['user']['nama'];
@@ -152,17 +152,25 @@ class _LoginScreenState extends State<LoginScreen> {
           status: 1,
         );
 
-        Settings updateSettings = Settings(id: 1, url: base_url, key: key_app);
-        dbHelper.updateSettings(updateSettings);
-        updateUser(user);
         setState(() {
-          isLogged = statusLogged;
+          Future.delayed(Duration(seconds: 2)).then((value) {
+            pr.hide().whenComplete(() {
+              if (kDebugMode) {
+                print(pr.isShowing());
+              }
+            });
+            Settings updateSettings =
+            Settings(id: 1, url: base_url, key: key_app);
+            dbHelper.updateSettings(updateSettings);
+            updateUser(user);
+          });
         });
       } else {
         setState(() {
           errorTitle = message;
           errorMessage = pesan;
           isError = true;
+
         });
         showErrorAlert(message, pesan);
       }
@@ -245,10 +253,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void goToMainMenu() {
-    setState(() {
-      _loginStatus = LoginStatus.signIn;
-      savePref(isLogged!, email!, pass!, uid!, key_app);
-    });
+    _loginStatus = LoginStatus.signIn;
+    savePref(isLogged!, email!, pass!, uid!, key_app);
     // Navigator.of(context).pop();
   }
 

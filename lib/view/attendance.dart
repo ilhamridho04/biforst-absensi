@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:attendance/view/components/developer_info.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -9,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
@@ -99,9 +102,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   void dispose() {
-    if(_timer.isActive) {
-      _timer.cancel();
-    }
+    _timer.cancel();
     super.dispose();
   }
 
@@ -129,10 +130,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 // Send data post via http
   Future<void> sendData() async {
     if (_value == null) {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            select_area, "warning", AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              '$select_area', "warning", AlertType.warning, context, true);
+        });
       });
       return;
     }
@@ -184,26 +187,44 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     pd.close();
 
     var data = response.data;
+    print("Ini data : $data");
     // Show response from server via snackBar
     if (data['message'] == 'Success!') {
-      String urlCekhadir =
-      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-      await cekKehadiran(urlCekhadir);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          String urlCekhadir =
+          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+          cekKehadiran(urlCekhadir);
+          Attendance attendance = Attendance(
+            id: data['id'],
+            date: data['date'],
+            time: data['time'],
+            location: data['location'],
+            type: "Check-In",
+          );
 
-      setState(() {
-        Attendance attendance = Attendance(
-          id: data['id'],
-          date: data['date'],
-          time: data['time'],
-          location: data['location'],
-          type: "Check-In",
-        );
+          // Insert the attendance
+          insertAttendance(attendance);
+          subscription.cancel();
 
-        // Insert the attendance
-        insertAttendance(attendance);
-        subscription.cancel();
-        utils.showAlertDialog(
-            attendance_success_ms, "success", AlertType.success, context, true);
+          Alert(
+            context: context,
+            type: AlertType.success,
+            title: "Success",
+            desc: "$attendance_show_alert-in $attendance_success_ms",
+            buttons: [
+              DialogButton(
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+                width: 120,
+                child: Text(
+                  ok_text,
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+              )
+            ],
+          ).show();
+        });
       });
     } else if (data['message'] == 'key_not_valid') {
       // Alert Dialog
@@ -235,55 +256,67 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           }
       );
     } else if (data['message'] == 'cannot_attend') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            outside_area, "warning", AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              outside_area, "warning", AlertType.warning, context, true);
+        });
       });
     } else if (data['message'] == 'location_not_found') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(location_not_found, "warning",
-            AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              location_not_found, "warning", AlertType.warning, context, true);
+        });
       });
     } else if (data['message'] == 'sudah_cek_in') {
-      setState(() {
-        subscription.cancel();
-        Alert(
-          context: context,
-          type: AlertType.info,
-          title: "Berhasil",
-          desc: already_check_in,
-          buttons: [
-            DialogButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-              width: 120,
-              child: Text(
-                ok_text,
-                style: TextStyle(color: Colors.white, fontSize: 20),
-              ),
-            )
-          ],
-        ).show();
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          subscription.cancel();
+          Alert(
+            context: context,
+            type: AlertType.info,
+            title: "Berhasil",
+            desc: "$already_check_in",
+            buttons: [
+              DialogButton(
+                child: Text(
+                  ok_text,
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+                width: 120,
+              )
+            ],
+          ).show();
+        });
       });
     } else if (data['message'] == 'check_in_first') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            check_in_first, "warning", AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              check_in_first, "warning", AlertType.warning, context, true);
+        });
       });
     } else if (data['message'] == 'error_something_went_wrong') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(attendance_error_server, "Error",
-            AlertType.error, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              attendance_error_server, "Error", AlertType.error, context, true);
+        });
       });
     } else {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(response.data.toString(), "Error",
-            AlertType.error, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(response.data.toString(), "Error",
+              AlertType.error, context, true);
+        });
       });
     }
   }
@@ -335,79 +368,93 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     var data = response.data;
     // Show response from server via snackBar
     if (data['message'] == 'Success!') {
-      String urlCekhadir =
-      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-      await cekKehadiran(urlCekhadir);
-      subscription.cancel();
-      setState(() {
-        Alert(
-          context: context,
-          type: AlertType.success,
-          title: "Success",
-          desc: "$attendance_show_alert-in $attendance_success_ms",
-          buttons: [
-            DialogButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-              width: 120,
-              child: Text(
-                ok_text,
-                style: TextStyle(color: Colors.white, fontSize: 20),
-              ),
-            )
-          ],
-        ).show();
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          String urlCekhadir =
+          utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+          cekKehadiran(urlCekhadir);
+          subscription.cancel();
+          Alert(
+            context: context,
+            type: AlertType.success,
+            title: "Success",
+            desc: "$attendance_show_alert-in $attendance_success_ms",
+            buttons: [
+              DialogButton(
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+                width: 120,
+                child: Text(
+                  ok_text,
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+              )
+            ],
+          ).show();
+        });
       });
     } else if (data['message'] == 'cannot_attend') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            outside_area, "warning", AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              outside_area, "warning", AlertType.warning, context, true);
+        });
       });
     } else if (data['message'] == 'location_not_found') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            location_not_found, "warning", AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              location_not_found, "warning", AlertType.warning, context, true);
+        });
       });
     } else if (data['message'] == 'sudah_cek_in') {
-      setState(() {
-        subscription.cancel();
-        Alert(
-          context: context,
-          type: AlertType.info,
-          title: "Berhasil",
-          desc: "$already_check_in",
-          buttons: [
-            DialogButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pop(),
-              width: 120,
-              child: Text(
-                ok_text,
-                style: TextStyle(color: Colors.white, fontSize: 20),
-              ),
-            )
-          ],
-        ).show();
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          subscription.cancel();
+          Alert(
+            context: context,
+            type: AlertType.info,
+            title: "Berhasil",
+            desc: "$already_check_in",
+            buttons: [
+              DialogButton(
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
+                width: 120,
+                child: Text(
+                  ok_text,
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+              )
+            ],
+          ).show();
+        });
       });
     } else if (data['message'] == 'check_in_first') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            check_in_first, "warning", AlertType.warning, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              check_in_first, "warning", AlertType.warning, context, true);
+        });
       });
     } else if (data['message'] == 'error_something_went_wrong') {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(
-            attendance_error_server, "Error", AlertType.error, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(
+              attendance_error_server, "Error", AlertType.error, context, true);
+        });
       });
     } else {
-      setState(() {
-        // Alert Dialog
-        utils.showAlertDialog(response.data.toString(), "Error",
-            AlertType.error, context, true);
+      Future.delayed(Duration(seconds: 0)).then((value) {
+        setState(() {
+          // Alert Dialog
+          utils.showAlertDialog(response.data.toString(), "Error",
+              AlertType.error, context, true);
+        });
       });
     }
     pd.close();
@@ -421,61 +468,48 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   void getSetting() async {
     var getSettings = await dbHelper.getSettings(1);
     var getUser = await dbHelper.getUser(1);
-    await getAreaApi();
     setState(() {
-      isLoading = true;
       getUrl = getSettings.url;
       getKey = getSettings.key;
       email = getUser.email;
       nama = getUser.nama;
       uid = getUser.uid;
       statusLogin = getUser.status;
+      getAreaApi();
     });
   }
 
-  Future<void> getAreaApi() async {
+  void getAreaApi() async {
     final uri = utils.getRealUrl(getUrl!, getPathArea!);
     Dio dio = Dio();
-    try {
-      final response = await dio.get(uri);
-      var data = response.data;
+    final response = await dio.get(uri);
 
-      if (data['message'] == 'success') {
-        final uri = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-        await cekKehadiran(uri);
-        setState(() {
-          dataArea = data['area'];
-        });
-      } else {
-        final uri = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-        await cekKehadiran(uri);
-        setState(() {
-          dataArea = [
-            {"id": 0, "name": "No Data Area"}
-          ];
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error fetching area data: $e');
-      }
+    var data = response.data;
+
+    if (data['message'] == 'success') {
+      final uri =
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
       setState(() {
-        dataArea = [
-          {"id": 0, "name": "Error fetching data"}
-        ];
+        cekKehadiran(uri);
+        dataArea = data['area'];
       });
-    } finally {
+    } else {
+      final uri =
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
       setState(() {
-        isLoading = false;
+        cekKehadiran(uri);
+        dataArea = [
+          {"id": 0, "name": "No Data Area"}
+        ];
       });
     }
   }
 
-  Future<void> cekKehadiran(url) async {
+  void cekKehadiran(url) async {
     Dio dio = Dio();
     final response = await dio.get(url);
-    var data = response.data;
     setState(() {
+      var data = response.data;
       if (data['message'] == "sudah_cek_in") {
         _tanggalMasuk = data['user']['tanggal'];
         _jamMasuk = data['user']['jam'];
@@ -548,16 +582,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       setState(() {
         _currentPosition = position;
+        _getAddressFromLatLng(_currentPosition!);
       });
-      await _getAddressFromLatLng(position);
     } catch (error) {
       if (kDebugMode) {
         print('Error fetching current position: $error');
       }
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -617,7 +647,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: isLoading || _isInitInProgress || dataArea.isEmpty
+      body: isLoading && _isInitInProgress
           ? Center(
         child: LoadingAnimationWidget.discreteCircle(
           color: ThemeColor.primary,
