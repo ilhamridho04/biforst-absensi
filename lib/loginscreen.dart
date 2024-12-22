@@ -52,11 +52,40 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     getSettings();
     getPermissionAttendance();
+
+    pr = ProgressDialog(context,
+        type: ProgressDialogType.normal, isDismissible: false, showLogs: false);
+
+    pr.style(
+        message: "Memeriksa...",
+        borderRadius: 10.0,
+        backgroundColor: Colors.white,
+        progressWidget: CircularProgressIndicator(),
+        elevation: 10.0,
+        padding: EdgeInsets.all(10.0),
+        insetAnimCurve: Curves.easeInOut,
+        progress: 0.0,
+        maxProgress: 100.0,
+        progressTextStyle: TextStyle(
+          color: Colors.black,
+          fontFamily: "MontserratRegular",
+          fontSize: screenWidth / 40,
+        ),
+        messageTextStyle: TextStyle(
+          color: Colors.black,
+          fontFamily: "MontserratRegular",
+          fontSize: screenWidth / 24,
+        ));
   }
 
   @override
   void dispose() {
     super.dispose();
+    pr.hide().whenComplete(() {
+      if (kDebugMode) {
+        print(pr.isShowing());
+      }
+    });
   }
 
   Future<void> getPermissionAttendance() async {
@@ -112,7 +141,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void login(String fromWhere) async {
-    if (fromWhere == 'clickButton') pr.show();
+    if (fromWhere == 'clickButton') {
+      pr.show();
+    }
     var urlLogin = "https://biforst.cbnet.my.id/api/auth/login2";
     try {
       var dio = Dio();
@@ -120,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
         "email": email,
         "password": pass,
       });
+
       final response = await dio.post(
         urlLogin,
         data: formData,
@@ -133,7 +165,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       var data = response.data;
       pr.hide().whenComplete(() {
-        print(pr.isShowing());
+        if (kDebugMode) {
+          print(pr.isShowing());
+        }
       });
       String message = data['message'];
       String pesan = data['pesan'];
@@ -319,7 +353,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void goToMainMenu() {
     _loginStatus = LoginStatus.signIn;
-    savePref(isLogged!, email!, pass!, uid!, "$key_app");
+    savePref(isLogged!, email!, pass!, uid!, key_app);
     // Navigator.of(context).pop();
   }
 
@@ -353,28 +387,7 @@ class _LoginScreenState extends State<LoginScreen> {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: ThemeColor.primary,
     ));
-    pr = ProgressDialog(context,
-        type: ProgressDialogType.normal, isDismissible: false, showLogs: false);
-    pr.style(
-        message: "Memeriksa...",
-        borderRadius: 10.0,
-        backgroundColor: Colors.white,
-        progressWidget: CircularProgressIndicator(),
-        elevation: 10.0,
-        padding: EdgeInsets.all(10.0),
-        insetAnimCurve: Curves.easeInOut,
-        progress: 0.0,
-        maxProgress: 100.0,
-        progressTextStyle: TextStyle(
-          color: Colors.black,
-          fontFamily: "MontserratRegular",
-          fontSize: screenWidth / 40,
-        ),
-        messageTextStyle: TextStyle(
-          color: Colors.black,
-          fontFamily: "MontserratRegular",
-          fontSize: screenWidth / 24,
-        ));
+
     switch (_loginStatus) {
       case LoginStatus.notSignIn:
         return Scaffold(
@@ -557,7 +570,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Row(
         children: [
-          Container(
+          SizedBox(
             width: screenWidth / 6,
             child: icon,
           ),

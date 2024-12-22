@@ -1,7 +1,9 @@
 import 'package:attendance/utils/utils.dart';
 import 'package:attendance/view/attendance.dart';
 import 'package:attendance/view/components/developer_info.dart';
+import 'package:attendance/view/components/realtime_location_stream.dart';
 import 'package:attendance/view/profile.dart';
+import 'package:attendance/view/trips.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -52,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
 
   List<IconData> navigationIcons = [
-    FontAwesomeIcons.calendarAlt,
+    FontAwesomeIcons.truckFast,
     FontAwesomeIcons.check,
     FontAwesomeIcons.user,
   ];
@@ -145,9 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : FadeIndexedStack(
         index: _currentIndex,
         children: [
-          Center(
-            child: Text("Event Screen"),
-          ),
+          RealtimeLocationStream(),
           AttendanceScreen(),
           ProfileScreen(),
         ],

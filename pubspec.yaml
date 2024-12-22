@@ -80,6 +80,8 @@ dependencies:
   path_provider_android: ^2.2.15
   path_provider_platform_interface: ^2.1.2
   safe_device: ^1.1.9
+  baseflow_plugin_template: ^2.2.0
+  google_places_flutter: ^2.0.9
 
 dev_dependencies:
   flutter_test:

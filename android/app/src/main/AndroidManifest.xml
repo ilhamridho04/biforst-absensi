@@ -23,7 +23,9 @@
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
-        android:requestLegacyExternalStorage="true">
+        android:hardwareAccelerated="true"
+        android:requestLegacyExternalStorage="true"
+        tools:targetApi="honeycomb">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -47,7 +49,7 @@
             android:value="2" />
 
         <meta-data android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAHdd2WTXrs9wwTOOHEfzSUjDUWnTEhb5w"/>
+            android:value="AIzaSyCgvE0RxqonDzC0wcZ-JgmTqruvxAU4U-E"/>
 
         <provider
             android:name="vn.hunghd.flutterdownloader.DownloadedFileProvider"
