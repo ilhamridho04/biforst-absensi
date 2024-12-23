@@ -9,7 +9,7 @@ part of 'single_user_response.dart';
 SingleUserResponse _$SingleUserResponseFromJson(Map<String, dynamic> json) =>
     SingleUserResponse()
       ..userResponse =
-      UserResponse.fromJson(json['data'] as Map<String, dynamic>);
+          UserResponse.fromJson(json['data'] as Map<String, dynamic>);
 
 Map<String, dynamic> _$SingleUserResponseToJson(SingleUserResponse instance) =>
     <String, dynamic>{

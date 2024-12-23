@@ -7,7 +7,7 @@ part of 'user_response.dart';
 // **************************************************************************
 
 UserResponse _$UserResponseFromJson(Map<String, dynamic> json) => UserResponse()
-  ..id = json['id'] as int
+  ..id = (json['id'] as num).toInt()
   ..nik = json['nik'] as String
   ..name = json['name'] as String
   ..username = json['username'] as String

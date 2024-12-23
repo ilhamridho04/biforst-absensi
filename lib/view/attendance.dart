@@ -112,16 +112,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionStreamSubscription?.cancel();
+    _serviceStatusStreamSubscription?.cancel();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _positionStreamSubscription?.pause();
-    } else if (state == AppLifecycleState.resumed) {
-      _positionStreamSubscription?.resume();
-    }
   }
 
   Future<void> getImage() async {
@@ -270,14 +262,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       final uri =
       utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
       cekKehadiran(uri);
-      dataArea = data['area'];
+      if(mounted){
+        setState(() {
+          dataArea = data['area'];
+        });
+      }
     } else {
       final uri =
       utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
       cekKehadiran(uri);
-      dataArea = [
-        {"id": 0, "name": "No Data Area"}
-      ];
+      if(mounted){
+        setState(() {
+          dataArea = [
+            {"id": 0, "name": "No Data Area"}
+          ];
+        });
+      }
     }
   }
 
@@ -285,18 +285,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
     Dio dio = Dio();
     final response = await dio.get(url);
     var data = response.data;
-    if (data['message'] == "sudah_cek_in") {
-      _tanggalMasuk = data['user']['tanggal'];
-      _jamMasuk = data['user']['jam'];
-      jamMasuk = data['user']['in'];
-      _jamPulang = data['user']['out'];
-    } else {
-      _tanggalMasuk = data['user']['tanggal'];
-      _jamMasuk = data['user']['jam'];
-      jamMasuk = data['user']['in'];
-      _jamPulang = data['user']['out'];
+    if(mounted){
+      setState(() {
+        if (data['message'] == "sudah_cek_in") {
+          _tanggalMasuk = data['user']['tanggal'];
+          _jamMasuk = data['user']['jam'];
+          jamMasuk = data['user']['in'];
+          _jamPulang = data['user']['out'];
+        } else {
+          _tanggalMasuk = data['user']['tanggal'];
+          _jamMasuk = data['user']['jam'];
+          jamMasuk = data['user']['in'];
+          _jamPulang = data['user']['out'];
+        }
+        isLoading = false;
+      });
     }
-    isLoading = false;
   }
 
   void initPlatformState() async {
@@ -325,27 +329,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       bool sd = await SafeDevice.isSafeDevice;
       bool dme = await SafeDevice.isDevelopmentModeEnable;
 
-      setState(() {
-        isMockLocation = ml;
-        isRealDevice = rd;
-        isOnExternalStorage = oes;
-        isSafeDevice = sd;
-        isDevelopmentModeEnable = dme;
-        if (kDebugMode) {
-          print('Ini Attendance : \nisMockLocation: $isMockLocation'
-              '\nisRealDevice: $isRealDevice'
-              '\nisOnExternalStorage: $isOnExternalStorage'
-              '\nisSafeDevice: $isSafeDevice'
-              '\nisDevelopmentModeEnable: $isDevelopmentModeEnable');
-        }
-      });
+      if(mounted){
+        setState(() {
+          isMockLocation = ml;
+          isRealDevice = rd;
+          isOnExternalStorage = oes;
+          isSafeDevice = sd;
+          isDevelopmentModeEnable = dme;
+          if (kDebugMode) {
+            print('Ini Attendance : \nisMockLocation: $isMockLocation'
+                '\nisRealDevice: $isRealDevice'
+                '\nisOnExternalStorage: $isOnExternalStorage'
+                '\nisSafeDevice: $isSafeDevice'
+                '\nisDevelopmentModeEnable: $isDevelopmentModeEnable');
+          }
+        });
+      }
     } catch (error) {
       if (kDebugMode) {
         print('Error initializing platform state: $error');
       }
     } finally {
-      _getCurrentPosition();
-      _isInitInProgress = false;
+      if(mounted){
+        _getCurrentPosition();
+        _isInitInProgress = false;
+      }
     }
   }
 
@@ -550,21 +558,25 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
           position.longitude
       );
       Placemark place = placemarks[0];
-      setState(() {
-        _currentPosition = position;
-        _currentAddress = '${place.subLocality}, ${place.locality}, ${place.administrativeArea}, ${place.postalCode}';
-      });
+      if(mounted){
+        setState(() {
+          _currentPosition = position;
+          _currentAddress = '${place.subLocality}, ${place.locality}, ${place.administrativeArea}, ${place.postalCode}';
+        });
+      }
     } catch (e) {
       debugPrint(e.toString());
     }
   }
 
   void _getTime() {
+    if (!mounted) return;
     final DateTime now = DateTime.now();
     _timeForCountUp = "$_tanggalMasuk $_jamMasuk";
     final Duration diff = DateTime.parse(_timeForCountUp!).difference(now);
-    _elapsedTime =
-    "${diff.inHours.abs()} jam, ${(diff.inMinutes.abs() % 60)} menit, ${(diff.inSeconds.abs() % 60)} detik";
+    setState(() {
+      _elapsedTime = "${diff.inHours.abs()} jam, ${(diff.inMinutes.abs() % 60)} menit, ${(diff.inSeconds.abs() % 60)} detik";
+    });
   }
 
   void _signOut() async {
@@ -657,7 +669,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
                               descriptions:
                               "Anda yakin ingin keluar dari aplikasi ?",
                               img: Image.asset(
-                                  'assets/images/logo.png'),
+                                  'assets/images/secure.png'),
                               btn: ElevatedButton(
                                 onPressed: () {
                                   _signOut();
@@ -996,7 +1008,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
             return CustomDialogBox(
               title: "Pembaruan tersedia !",
               descriptions: key_not_valid,
-              img: Image.asset('assets/images/logo.png'),
+              img: Image.asset('assets/images/secure.png'),
               btn: ElevatedButton(
                 onPressed: () {
                   setState(() {

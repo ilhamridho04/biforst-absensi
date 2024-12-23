@@ -39,7 +39,7 @@ class _DialogsState extends State<Dialogs> {
                         ),
                       ),
                     ),
-                    img: Image.asset('assets/images/logo.png'),
+                    img: Image.asset('assets/images/secure.png'),
                   );
                 });
           },

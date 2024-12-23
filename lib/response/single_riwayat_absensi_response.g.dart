@@ -7,13 +7,13 @@ part of 'single_riwayat_absensi_response.dart';
 // **************************************************************************
 
 SingleRiwayatAbsensiResponse _$SingleRiwayatAbsensiResponseFromJson(
-    Map<String, dynamic> json) =>
+        Map<String, dynamic> json) =>
     SingleRiwayatAbsensiResponse()
       ..riwayatAbsensi =
-      RiwayatAbsensiResponse.fromJson(json['data'] as Map<String, dynamic>);
+          RiwayatAbsensiResponse.fromJson(json['data'] as Map<String, dynamic>);
 
 Map<String, dynamic> _$SingleRiwayatAbsensiResponseToJson(
-    SingleRiwayatAbsensiResponse instance) =>
+        SingleRiwayatAbsensiResponse instance) =>
     <String, dynamic>{
       'data': instance.riwayatAbsensi,
     };

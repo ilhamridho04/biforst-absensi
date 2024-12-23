@@ -115,7 +115,7 @@ class _SplashScreenState extends State<SplashScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Image(
-                  image: AssetImage('assets/images/logo.png'),
+                  image: AssetImage('assets/images/secure.png'),
                 ),
                 SizedBox(
                   height: 10.0,
@@ -134,13 +134,10 @@ class _SplashScreenState extends State<SplashScreen> {
                         ),
                         child: AnimatedTextKit(
                           animatedTexts: [
-                            RotateAnimatedText('Brave'),
-                            RotateAnimatedText('Innovative'),
-                            RotateAnimatedText('Futuristic'),
-                            RotateAnimatedText('Original'),
-                            RotateAnimatedText('Reciprocative'),
-                            RotateAnimatedText('Service Excellent'),
-                            RotateAnimatedText('Transformative'),
+                            RotateAnimatedText('Ini'),
+                            RotateAnimatedText('Adalah'),
+                            RotateAnimatedText('Contoh'),
+                            RotateAnimatedText('Aplikasi'),
                           ],
                           onTap: () {
                             print("Tap Event");
@@ -207,7 +204,7 @@ class _SplashScreenState extends State<SplashScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           Image(
-            image: AssetImage('assets/images/logo.png'),
+            image: AssetImage('assets/images/secure.png'),
           ),
           SizedBox(
             height: 10.0,

@@ -7,10 +7,10 @@ part of 'riwayat_absensi_response.dart';
 // **************************************************************************
 
 RiwayatAbsensiResponse _$RiwayatAbsensiResponseFromJson(
-    Map<String, dynamic> json) =>
+        Map<String, dynamic> json) =>
     RiwayatAbsensiResponse()
-      ..id = json['id'] as int
-      ..absen_user_id = json['absen_user_id'] as int
+      ..id = (json['id'] as num).toInt()
+      ..absen_user_id = (json['absen_user_id'] as num).toInt()
       ..absen_tanggal = json['absen_tanggal'] as String
       ..absen_jam_masuk = json['absen_jam_masuk'] as String
       ..absen_jam_pulang = json['absen_jam_pulang'] as String
@@ -27,7 +27,7 @@ RiwayatAbsensiResponse _$RiwayatAbsensiResponseFromJson(
       ..area = json['area'] as String;
 
 Map<String, dynamic> _$RiwayatAbsensiResponseToJson(
-    RiwayatAbsensiResponse instance) =>
+        RiwayatAbsensiResponse instance) =>
     <String, dynamic>{
       'id': instance.id,
       'absen_user_id': instance.absen_user_id,
