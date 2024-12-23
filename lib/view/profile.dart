@@ -54,15 +54,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> getSetting() async {
     var getSettings = await dbHelper.getSettings(1);
     var getUser = await dbHelper.getUser(1);
-    setState(() {
-      getUrl = getSettings.url;
-      getKey = getSettings.key;
-      email = getUser.email;
-      nama = getUser.nama;
-      uid = getUser.uid;
+    getUrl = getSettings.url;
+    getKey = getSettings.key;
+    email = getUser.email;
+    nama = getUser.nama;
+    uid = getUser.uid;
 
-      _getUser();
-    });
+    _getUser();
   }
 
   Future<void> _getUser() async {
@@ -71,13 +69,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       response = await httpService.getRequest("/api/auth/user/$uid");
       if (response.statusCode == 200) {
         var data = response.data;
-        setState(() {
-          isLoading = false;
-          singleUserResponse = SingleUserResponse.fromJson(data);
+        isLoading = false;
+        singleUserResponse = SingleUserResponse.fromJson(data);
 
-          userResponse = singleUserResponse.userResponse;
-          // print(data);
-        });
+        userResponse = singleUserResponse.userResponse;
       } else {
         isLoading = false;
         print("Gagal mendapatkan data");

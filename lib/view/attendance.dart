@@ -55,7 +55,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
   static const String _kPermissionGrantedMessage = 'Permission granted.';
 
   final GeolocatorPlatform _geolocatorPlatform = GeolocatorPlatform.instance;
-  final List<_PositionItem> _positionItems = <_PositionItem>[];
   StreamSubscription<Position>? _positionStreamSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusStreamSubscription;
   bool positionStreamStarted = false;
@@ -78,7 +77,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       getPathArea = '/api/auth/area',
       getPath = '/api/auth/hadir';
   String jamNull = "--:--:--";
-  int? statusLogin, uid, role, absen_id;
+  int? statusLogin, uid, role;
   double screenHeight = 0;
   double screenWidth = 0;
   Color primary = Colors.blue;
@@ -91,16 +90,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
   String? _currentAddress;
   final Geolocator geoLocator = Geolocator();
 
-  late ProgressDialog pd;
   late bool clickButton = false, isLoading = true;
   bool isUpdate = false;
-  var _value;
+  String? areaValue;
   double setAccuracy = 200.0;
   File? _image, newImage;
 
   List dataArea = [];
-
-  late Timer _timer;
   Settings? settings;
 
   @override
@@ -116,7 +112,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionStreamSubscription?.cancel();
-    _timer.cancel();
     super.dispose();
   }
 
@@ -141,7 +136,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       final File imageTemp = File(image.path);
       _image = imageTemp;
       setState(() {
-        sendData();
+        sendData(context);
       });
     } on PlatformException catch (e) {
       if (kDebugMode) {
@@ -151,8 +146,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
   }
 
   // Send data post via http
-  Future<void> sendData() async {
-    if (_value == null) {
+  void sendData(context) async {
+    if (areaValue == null) {
       utils.showAlertDialog(
           "Pilih area terlebih dahulu !", "warning", AlertType.warning, context, true);
     }
@@ -164,7 +159,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       'q': 'in',
       'lat': _currentPosition!.latitude,
       'longt': _currentPosition!.longitude,
-      'area_id': _value,
+      'area_id': areaValue,
       'absen_area': _currentAddress,
       'file': await MultipartFile.fromFile(_image!.path, filename: fileName),
     };
@@ -173,7 +168,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
     FormData formData = FormData.fromMap(body);
 
     ProgressDialog pd = ProgressDialog(context: context);
-
     pd.show(
       max: 100,
       msg: 'Sedang upload gambar...',
@@ -200,13 +194,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
     pd.close();
 
     var data = response.data;
-    print("Ini data : " + data.toString());
+    if (kDebugMode) {
+      print("Ini data : $data");
+    }
     setState(() {
-      handleResponse(data, uid.toString(), cekKehadiran);
+      handleResponse(context, data, uid.toString(), cekKehadiran);
     });
   }
 
-  Future<void> _cekOut() async {
+  void _cekOut(context) async {
     var dataKey = getKey;
     Map<String, dynamic> body = {
       'key': dataKey,
@@ -244,7 +240,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
     pd.close();
     var data = response.data;
     setState(() {
-      handleResponse(data, uid.toString(), cekKehadiran);
+      handleResponse(context, data, uid.toString(), cekKehadiran);
     });
   }
 
@@ -256,61 +252,51 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
   void getSetting() async {
     var getSettings = await dbHelper.getSettings(1);
     var getUser = await dbHelper.getUser(1);
-    setState(() {
-      getUrl = getSettings.url;
-      getKey = getSettings.key;
-      email = getUser.email;
-      nama = getUser.nama;
-      uid = getUser.uid;
-      statusLogin = getUser.status;
-      getAreaApi();
-    });
+    getUrl = getSettings.url;
+    getKey = getSettings.key;
+    email = getUser.email;
+    nama = getUser.nama;
+    uid = getUser.uid;
+    statusLogin = getUser.status;
+    getAreaApi();
   }
 
   void getAreaApi() async {
     final uri = utils.getRealUrl(getUrl!, getPathArea!);
     Dio dio = Dio();
     final response = await dio.get(uri);
-
     var data = response.data;
-
     if (data['message'] == 'success') {
       final uri =
       utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
-      setState(() {
-        cekKehadiran(uri);
-        dataArea = data['area'];
-      });
+      cekKehadiran(uri);
+      dataArea = data['area'];
     } else {
       final uri =
-      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
-      setState(() {
-        cekKehadiran(uri);
-        dataArea = [
-          {"id": 0, "name": "No Data Area"}
-        ];
-      });
+      utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
+      cekKehadiran(uri);
+      dataArea = [
+        {"id": 0, "name": "No Data Area"}
+      ];
     }
   }
 
   void cekKehadiran(url) async {
     Dio dio = Dio();
     final response = await dio.get(url);
-    setState(() {
-      var data = response.data;
-      if (data['message'] == "sudah_cek_in") {
-        _tanggalMasuk = data['user']['tanggal'];
-        _jamMasuk = data['user']['jam'];
-        jamMasuk = data['user']['in'];
-        _jamPulang = data['user']['out'];
-      } else {
-        _tanggalMasuk = data['user']['tanggal'];
-        _jamMasuk = data['user']['jam'];
-        jamMasuk = data['user']['in'];
-        _jamPulang = data['user']['out'];
-      }
-      isLoading = false;
-    });
+    var data = response.data;
+    if (data['message'] == "sudah_cek_in") {
+      _tanggalMasuk = data['user']['tanggal'];
+      _jamMasuk = data['user']['jam'];
+      jamMasuk = data['user']['in'];
+      _jamPulang = data['user']['out'];
+    } else {
+      _tanggalMasuk = data['user']['tanggal'];
+      _jamMasuk = data['user']['jam'];
+      jamMasuk = data['user']['in'];
+      _jamPulang = data['user']['out'];
+    }
+    isLoading = false;
   }
 
   void initPlatformState() async {
@@ -358,10 +344,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
         print('Error initializing platform state: $error');
       }
     } finally {
-      setState(() {
-        _getCurrentPosition();
-        _isInitInProgress = false;
-      });
+      _getCurrentPosition();
+      _isInitInProgress = false;
     }
   }
 
@@ -374,11 +358,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
 
     final position = await _geolocatorPlatform.getCurrentPosition();
     _getAddressFromLatLng(position);
-    print("Ini posisi : " + position.toString());
-    _updatePositionList(
-      _PositionItemType.position,
-      position.toString(),
-    );
+    if (kDebugMode) {
+      print("Ini posisi : $position");
+    }
   }
 
   Future<bool> _handlePermission() async {
@@ -391,9 +373,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       // Location services are not enabled don't continue
       // accessing the position and request users of the
       // App to enable the location services.
-      _updatePositionList(
-        _PositionItemType.log,
-        _kLocationServicesDisabledMessage,
+
+      AlertDialog(
+        title: const Text('Location services disabled'),
+        content: const Text(_kLocationServicesDisabledMessage),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
       );
 
       return false;
@@ -408,9 +399,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
         // Android's shouldShowRequestPermissionRationale
         // returned true. According to Android guidelines
         // your App should show an explanatory UI now.
-        _updatePositionList(
-          _PositionItemType.log,
-          _kPermissionDeniedMessage,
+
+        AlertDialog(
+          title: const Text('Location permissions denied'),
+          content: const Text(_kPermissionDeniedMessage),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
         );
 
         return false;
@@ -419,26 +419,34 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
 
     if (permission == LocationPermission.deniedForever) {
       // Permissions are denied forever, handle appropriately.
-      _updatePositionList(
-        _PositionItemType.log,
-        _kPermissionDeniedForeverMessage,
+      AlertDialog(
+        title: const Text('Location permissions denied'),
+        content: const Text(_kPermissionDeniedForeverMessage),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
       );
-
       return false;
     }
 
-    // When we reach here, permissions are granted and we can
-    // continue accessing the position of the device.
-    _updatePositionList(
-      _PositionItemType.log,
-      _kPermissionGrantedMessage,
+    AlertDialog(
+      title: const Text('Location permissions granted'),
+      content: const Text(_kPermissionGrantedMessage),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('OK'),
+        ),
+      ],
     );
     return true;
-  }
-
-  void _updatePositionList(_PositionItemType type, String displayValue) {
-    _positionItems.add(_PositionItem(type, displayValue));
-    setState(() {});
   }
 
   void _toggleServiceStatusStream() {
@@ -460,15 +468,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
                 setState(() {
                   _positionStreamSubscription?.cancel();
                   _positionStreamSubscription = null;
-                  _updatePositionList(
-                      _PositionItemType.log, 'Position Stream has been canceled');
+
+                  AlertDialog(
+                    title: const Text('Location service status changed'),
+                    content: const Text('Location service has been disabled'),
+                    actions: <Widget>[
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  );
                 });
               }
               serviceStatusValue = 'disabled';
             }
-            _updatePositionList(
-              _PositionItemType.log,
-              'Location service has been $serviceStatusValue',
+
+            AlertDialog(
+              title: const Text('Location service status changed'),
+              content: Text('Location service has been $serviceStatusValue'),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
             );
           });
     }
@@ -480,10 +508,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       _positionStreamSubscription = positionStream.handleError((error) {
         _positionStreamSubscription?.cancel();
         _positionStreamSubscription = null;
-      }).listen((position) => _updatePositionList(
-        _PositionItemType.position,
-        position.toString(),
-      ));
+      }).listen((position) =>
+        _getAddressFromLatLng(position)
+      );
       _positionStreamSubscription?.pause();
     }
 
@@ -501,9 +528,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
         statusDisplayValue = 'paused';
       }
 
-      _updatePositionList(
-        _PositionItemType.log,
-        'Listening for position updates $statusDisplayValue',
+      AlertDialog(
+        title: const Text('Location permissions granted'),
+        content: Text('Listening for position updates $statusDisplayValue'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
       );
     });
   }
@@ -553,10 +588,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
       );
       dbHelper.updateUser(user);
     });
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
+    if (mounted) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (context) => KeyboardVisibilityProvider(
           child: LoginScreen(),
-        )));
+        ),
+      ));
+    }
   }
 
   @override
@@ -836,54 +874,48 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
                     ),
                   ),
                   StreamBuilder(
-                      stream: Stream.periodic(
-                          Duration(seconds: 1)),
-                      builder: (context, snapshot) {
+                    stream: Stream.periodic(Duration(seconds: 1)),
+                    builder: (context, snapshot) {
+                      setState(() {
                         _getTime();
-                        return Container(
-                          height: screenHeight / 16,
-                          margin: EdgeInsets.only(
-                            top: 8,
-                            bottom: 24,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ThemeColor.primary,
-                            borderRadius: BorderRadius.all(
-                                Radius.circular(15)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 10,
-                                offset: Offset(2, 2),
+                      });
+                      return Container(
+                        height: screenHeight / 16,
+                        margin: EdgeInsets.only(
+                          top: 8,
+                          bottom: 24,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ThemeColor.primary,
+                          borderRadius: BorderRadius.all(Radius.circular(15)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 10,
+                              offset: Offset(2, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.all(Radius.circular(15)),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$_elapsedTime',
+                                style: TextStyle(
+                                  fontFamily: "MontserratRegular",
+                                  fontSize: screenWidth / 18,
+                                  color: ThemeColor.white,
+                                ),
                               ),
                             ],
                           ),
-                          child: ClipRRect(
-                            borderRadius:
-                            const BorderRadius.all(
-                                Radius.circular(15)),
-                            child: Row(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.center,
-                              mainAxisAlignment:
-                              MainAxisAlignment.center,
-                              children: [
-                                // perulangan Expanded
-                                Text(
-                                  '$_elapsedTime',
-                                  style: TextStyle(
-                                    fontFamily:
-                                    "MontserratRegular",
-                                    fontSize:
-                                    screenWidth / 18,
-                                    color: ThemeColor.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               )
                   : SizedBox(),
@@ -923,7 +955,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
                       innerColor: ThemeColor.red,
                       key: key,
                       onSubmit: () async {
-                        await _cekOut();
+                        _cekOut(context);
                         return null;
                       },
                     );
@@ -939,10 +971,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
     );
   }
 
-  Future<void> handleResponse(dynamic data, String uid, Function cekKehadiran) async {
+  Future<void> handleResponse(context, dynamic data, String uid, Function cekKehadiran) async {
     if (data['message'] == 'Success!') {
       setState(() {
-        String urlCekhadir = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/" + "$uid");
+        String urlCekhadir = utils.getRealUrl(getUrl!, "/api/auth/kehadiran/$uid");
         cekKehadiran(urlCekhadir);
         Attendance attendance = Attendance(
           id: data['id'],
@@ -1085,10 +1117,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> with WidgetsBinding
               ),
             );
           }).toList(),
-          value: _value,
+          value: areaValue,
           onChanged: (value) {
             setState(() {
-              _value = value;
+              areaValue = value;
             });
           },
           buttonStyleData: ButtonStyleData(
@@ -1152,18 +1184,4 @@ class TaskInfo {
   String? taskId;
   int? progress = 0;
   DownloadTaskStatus? status = DownloadTaskStatus.undefined;
-}
-
-
-
-enum _PositionItemType {
-  log,
-  position,
-}
-
-class _PositionItem {
-  _PositionItem(this.type, this.displayValue);
-
-  final _PositionItemType type;
-  final String displayValue;
 }

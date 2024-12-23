@@ -12,16 +12,16 @@ import '../model/user.dart';
 import '../utils/strings.dart';
 import '../utils/utils.dart';
 
-class SplasScreen extends StatefulWidget {
-  const SplasScreen({super.key});
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
 
   @override
   State<StatefulWidget> createState() {
-    return _SplasScreenState();
+    return _SplashScreenState();
   }
 }
 
-class _SplasScreenState extends State<SplasScreen> {
+class _SplashScreenState extends State<SplashScreen> {
   DbHelper dbHelper = DbHelper();
   Utils utils = Utils();
 
@@ -39,7 +39,7 @@ class _SplasScreenState extends State<SplasScreen> {
     // Insert the settings
     insertSettings(settings!);
 
-    //inser User
+    // Insert User
     User user = User(
       id: 1,
       uid: 1,
@@ -84,7 +84,7 @@ class _SplasScreenState extends State<SplasScreen> {
     splashScreen();
   }
 
-  // Show splash scree with time duration
+  // Show splash screen with time duration
   splashScreen() async {
     var duration = const Duration(seconds: 5);
     return Timer(duration, () {
@@ -92,7 +92,7 @@ class _SplasScreenState extends State<SplasScreen> {
     });
   }
 
-  // Got to main menu after scanning the QR or if user scanned the QR.
+  // Go to main menu after scanning the QR or if user scanned the QR.
   goToLoginPage() {
     if (_isAlreadyDoSettings == 'yes') {
       Navigator.of(context).push(_createRoute());

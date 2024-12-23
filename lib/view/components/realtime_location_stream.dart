@@ -5,9 +5,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 
 import '../../model/colors.dart';
+import 'google_map_component.dart';
 
 class RealtimeLocationStream extends StatefulWidget {
-  const RealtimeLocationStream({Key? key}) : super(key: key);
+  const RealtimeLocationStream({super.key});
 
   @override
   State<RealtimeLocationStream> createState() => _RealtimeLocationStreamState();
@@ -20,8 +21,15 @@ class _RealtimeLocationStreamState extends State<RealtimeLocationStream> {
   final Completer<GoogleMapController> _mapController = Completer<GoogleMapController>();
   StreamSubscription<Position>? _positionStreamSubscription;
 
-  List<LatLng> _routeCoordinates = [];
+  final List<LatLng> _routeCoordinates = [];
   Set<Polyline> _polylines = {};
+
+  String? _tripId;
+  String? _tripStatus;
+  String? _muatLat;
+  String? _muatLong;
+  String? _bongkarLat;
+  String? _bongkarLong;
 
   @override
   void initState() {
@@ -39,9 +47,11 @@ class _RealtimeLocationStreamState extends State<RealtimeLocationStream> {
   Future<bool> _handlePermission() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Location services are disabled. Please enable them.')),
-      );
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location services are disabled. Please enable them.')),
+        );
+      }
       return false;
     }
 
@@ -49,17 +59,21 @@ class _RealtimeLocationStreamState extends State<RealtimeLocationStream> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location permissions are denied.')),
-        );
+        if(mounted){
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Location permissions are denied.')),
+          );
+        }
         return false;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Location permissions are permanently denied.')),
-      );
+      if(mounted){
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location permissions are permanently denied.')),
+        );
+      }
       return false;
     }
 
@@ -112,28 +126,13 @@ class _RealtimeLocationStreamState extends State<RealtimeLocationStream> {
       body: (_currentPosition != null)
           ? Column(
         children: [
-          Expanded(
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  _currentPosition!.latitude,
-                  _currentPosition!.longitude,
-                ),
-                zoom: 17,
-              ),
-              markers: {
-                Marker(
-                  markerId: const MarkerId('current_location'),
-                  position: LatLng(
-                    _currentPosition!.latitude,
-                    _currentPosition!.longitude,
-                  ),
-                  infoWindow: const InfoWindow(title: 'Current Location'),
-                ),
-              },
-              polylines: _polylines,
-              onMapCreated: (controller) => _mapController.complete(controller),
-            ),
+          GoogleMapComponent(
+            currentPosition: _currentPosition!,
+            polylines: _polylines,
+            mapController: _mapController,
+          ),
+          const SizedBox(
+            height: 20,
           ),
           SlideAction(
             text: "Geser Mulai Muat",
@@ -149,6 +148,9 @@ class _RealtimeLocationStreamState extends State<RealtimeLocationStream> {
               _startLocationStream();
               return null;
             },
+          ),
+          const SizedBox(
+            height: 20,
           ),
         ],
       )
